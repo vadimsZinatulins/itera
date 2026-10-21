@@ -1,0 +1,102 @@
+import { expect, test } from '@playwright/test';
+import { admin, browserSignIn, provisionAccount } from './fixtures';
+
+test('rendered-first editor, order, undo, saved output, navigation guard and failure honesty', async ({ page }) => {
+  const account = await provisionAccount();
+  const origin = process.env.TEST_BASE_URL!;
+  try {
+    await browserSignIn(page, account.email);
+    const subject = await (await page.request.post('/api/subjects', { headers: { origin }, data: { name: 'Writing' } })).json();
+    await page.goto(`/?subject=${subject.id}`);
+    await page.getByRole('button', { name: 'New Learning Document', exact: true }).click();
+    await page.getByLabel('Document title', { exact: true }).fill('My learning');
+    await page.getByLabel('Document description', { exact: true }).fill('Notes to reuse');
+    await page.getByRole('button', { name: 'Add Markdown block', exact: true }).click();
+    await page.getByLabel('Block 1 Markdown').fill('## First\n\n**Bold idea**');
+    // Composition must not accidentally commit.
+    await page.getByLabel('Block 1 Markdown').dispatchEvent('keydown', { key: 'Enter', ctrlKey: true, isComposing: true });
+    await expect(page.getByLabel('Block 1 Markdown')).toBeVisible();
+    await page.getByLabel('Block 1 Markdown').press('Meta+Enter');
+    await expect(page.getByRole('heading', { name: 'First', exact: true })).toBeVisible();
+    await page.getByRole('heading', { name: 'First', exact: true }).dblclick();
+    await page.getByLabel('Block 1 Markdown').fill('Discard this');
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'First', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Insert block before block 1', exact: true }).click();
+    await page.getByLabel('Block 1 Markdown').fill('Second block');
+    await page.getByRole('button', { name: 'Save block', exact: true }).click();
+    await page.getByRole('article', { name: 'Block 1', exact: true }).hover();
+    await page.getByRole('button', { name: 'Move block 1 down', exact: true }).click();
+    await page.getByRole('button', { name: 'Delete block 1', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'First', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Undo delete', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'First', exact: true })).toBeVisible();
+    page.once('dialog', dialog => dialog.dismiss());
+    await page.getByRole('button', { name: 'All Learning Documents', exact: true }).click();
+    await expect(page.getByLabel('Document title', { exact: true })).toHaveValue('My learning');
+    await page.route('**/api/documents', route => route.fulfill({ status: 503, json: { error: 'Save failed. Try again.' } }));
+    await page.getByRole('button', { name: 'Save as Draft', exact: true }).click();
+    await expect(page.getByRole('alert').filter({ hasText: 'Save failed' })).toBeVisible();
+    await expect(page.getByLabel('Document title', { exact: true })).toHaveValue('My learning');
+    await page.unroute('**/api/documents');
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    await page.route('**/api/documents', async route => { await gate; await route.continue(); });
+    await page.getByRole('button', { name: 'Save as Draft', exact: true }).click();
+    await expect(page.getByRole('status')).toHaveText('Saving…');
+    release();
+    await expect(page.getByRole('status')).toContainText('Saved on server');
+    await page.unroute('**/api/documents');
+    await page.getByLabel('Document title', { exact: true }).fill('Unsaved title');
+    await page.getByRole('button', { name: 'Final Markdown', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    const expected = '# My learning\n\nNotes to reuse\n\n## First\n\n**Bold idea**\n\nSecond block\n';
+    await expect(dialog.locator('pre')).toHaveText(expected);
+    const download = page.waitForEvent('download');
+    await dialog.getByRole('button', { name: 'Download .md', exact: true }).click();
+    const file = await download;
+    const stream = await file.createReadStream();
+    const parts: Buffer[] = [];
+    for await (const part of stream) parts.push(Buffer.from(part));
+    expect(Buffer.concat(parts).toString()).toBe(expected);
+    await page.keyboard.press('Escape');
+    page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('button', { name: 'All Learning Documents', exact: true }).click();
+    await page.getByLabel('Search Learning Documents').fill('bold idea');
+    await page.getByRole('button', { name: 'Open My learning', exact: true }).click();
+    await expect(page.getByLabel('Document title', { exact: true })).toHaveValue('My learning');
+    await page.getByRole('button', { name: 'Document preview', exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('heading', { name: 'First', exact: true })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await page.reload();
+    await page.getByRole('button', { name: 'Open My learning', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'First', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Log out', exact: true }).click();
+    await expect(page.getByLabel('Email address')).toBeVisible();
+    await page.waitForTimeout(2100);
+    await browserSignIn(page, account.email);
+    await page.getByRole('button', { name: 'Open My learning', exact: true }).click();
+    await expect(page.getByText('Second block', { exact: true })).toBeVisible();
+  } finally { await admin().auth.admin.deleteUser(account.id); }
+});
+
+test('touch actions remain visible on narrow screens', async ({ browser }) => {
+  const account = await provisionAccount();
+  const context = await browser.newContext({ viewport: { width: 320, height: 740 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await browserSignIn(page, account.email);
+    const origin = process.env.TEST_BASE_URL!;
+    const subject = await (await page.request.post('/api/subjects', { headers: { origin }, data: { name: 'Touch' } })).json();
+    await page.goto(`/?subject=${subject.id}`);
+    await page.getByRole('button', { name: 'New Learning Document', exact: true }).tap();
+    await page.getByRole('button', { name: 'Add Markdown block', exact: true }).tap();
+    await page.getByLabel('Block 1 Markdown').fill('Touch content');
+    await page.getByRole('button', { name: 'Save block', exact: true }).tap();
+    const edit = page.getByRole('button', { name: 'Edit block 1', exact: true });
+    await expect(edit).toHaveCSS('opacity', '1');
+    await edit.tap();
+    await expect(page.getByLabel('Block 1 Markdown')).toHaveValue('Touch content');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  } finally { await context.close(); await admin().auth.admin.deleteUser(account.id); }
+});
