@@ -9,7 +9,7 @@ Ticket: `docs/production-plan:.scratch/production-release/issues/03-author-learn
 - Conflict returns 409 without changing the saved record. Attempted text remains in the editor. Refresh/review displays the latest saved version alongside it; replacing attempted edits requires confirmation. No automatic merge or force-overwrite.
 - Draft limits at the database boundary: 300 title characters, 5000 description characters, 200 blocks and 500 KB serialized block content. API also limits request size.
 - Preview/copy/download use the selected successfully saved Draft, not outstanding edits. Markdown rendering does not allow raw HTML. These exports are document reuse, not account backups.
-- Leaving through the document list, Subject picker or logout requires discarding unsaved changes or cancelling to save. Subject Back/Forward history retains outstanding Draft and open-block buffers in the mounted account page. Browser unload warns while dirty. No browser-termination recovery or offline editing guarantee. Logout clears the client through full navigation; saved Drafts remain in Supabase.
+- Leaving through the document list, Subject picker or logout requires discarding unsaved changes or cancelling to save. Subject Back/Forward history retains outstanding Draft and open-block buffers in the mounted account page. Account-level logout/Subject-navigation and browser-unload guards include dirty buffers in inactive Subjects, not only the visible editor. No browser-termination recovery or offline editing guarantee. Logout clears the client through full navigation; saved Drafts remain in Supabase.
 - Draft saving never approves practice material or records understanding. No Practice approval or AI action is exposed in this slice.
 
 ## Verification
