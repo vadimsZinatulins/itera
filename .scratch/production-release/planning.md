@@ -1,6 +1,6 @@
 # First production release — planning discussion
 
-Status: WIP interview paused for a prototype detour; not an implementation spec
+Status: shared understanding confirmed; interview complete; spec synthesis explicitly paused
 
 ## Purpose
 
@@ -8,7 +8,7 @@ Turn the accepted prototype direction into a sufficiently clear first-release pl
 
 ## Sources and baseline
 
-- Accepted prototype: `prototype/main-workflow`, commit `51db7f8`.
+- Original accepted prototype: commit `51db7f8`. The user subsequently authorised merging the Subject understanding detour into `prototype/main-workflow`, now at `09d31d9`; this branch is no longer frozen at the original commit.
 - Existing exploration: [main workflow map](../main-workflow/map.md) and its linked decision tickets. Their administrative statuses do not imply the user rejected the prototype; the user explicitly declared prototyping finished.
 - Domain language: root `GLOSSARY.md`.
 - `PROJECT.md` is the original idea, not an authoritative specification. Its tutor/MCP-centred MVP differs from the manual Learning Document workflow explored in the prototype; first-release scope must explicitly settle this difference.
@@ -73,9 +73,59 @@ The latest unanswered proposals are **Q22** (include a minimal Subject-specific 
 
 The prototype should make the distinction between approved study material, disposable conversations, and a durable understanding record tangible. It should expose the effects of finishing, reviewing/applying an update, and deleting a conversation. Whether the understanding record survives that deletion is deliberately unsettled. Return user-validated findings to this discussion before resuming the production spec.
 
+### Runnable detour artifact
+
+Built on throwaway branch `prototype/subject-learning-profile` (through `d22800b`), then merged into `prototype/main-workflow` at `09d31d9` at the user's explicit request. The original prototype remains available at `51db7f8`. See [run instructions, walkthrough, live feedback and open questions](learning-profile-prototype.md).
+
+**User rejected all v1 layouts** (`f821379`): the experience should be seamless, with just Learning Trail. The first message registers a conversation; past conversations remain visible and continuable. Conversations plus recaps should affect the Subject knowledge base. They also want a visual representation but have not chosen its form. This supersedes the prototype's separate Learning profile workspace and explicit Start/Finish ceremony as the direction to explore; it does not select automatic update/retention semantics or a canonical name.
+
+V2 keeps one conversational trail with inline recaps and compares topic landscape, connected-concept and evidence-trail views. Tentative conversation quotes versus reviewed recap interpretations are an explicit provisional model. The user **prefers B (connected concepts)** and requests the missing proactive practice entry points: proposed open threads and a quick-assessment button, with assessment allowed inside the same chat. V3 restores those entries and a resumable scripted three-question assessment with an inline correctable recap. **Awaiting reaction to the assessment flow; interpretation timing and assessment defaults remain provisional.**
+
+### Return to grilling
+
+The user resumed the interview using `/tmp/itera-first-product-return-handoff.md` and explicitly requested returning to `docs/production-plan`. Carried forward only the updated planning notes and prototype-return artifact from `09d31d9`; no throwaway UI code was merged into the planning branch. The preferred direction is seamless Learning Trail, B's connected concepts, suggested open threads and same-chat assessment. The merge preserves this direction, not blanket approval of its provisional semantics.
+
+Q22/Q23 must not be repeated as if the v1 separate workspace and explicit Finish ceremony remain the proposed baseline. The new interaction direction supersedes that framing; production scope and interpretation policy still need explicit decisions.
+
+### Round 7 — revised first-release baseline accepted
+
+- **Q24 accepted:** First release includes the seamless Subject Learning Trail, automatically saved/resumable conversations, B's connected-concepts understanding view, suggested open threads, same-chat short/resumable assessment, and inline accept/correct/dismiss recaps without ending the conversation. Scripted defaults such as exactly three questions or automatic recap timing are not accepted merely through this baseline decision. This includes a minimal evolving understanding record, while complex scoring, scheduling and knowledge-graph engines remain deferred.
+- **Q25 accepted:** Conversations automatically contribute tentative context visible in the trail/map. Only accepted or learner-corrected recaps contribute the durable interpretation used for future practice. Unreviewed AI interpretations must not silently become conclusions about understanding. Conversation continuation is independent of recap review.
+- **Q26 accepted:** Deleting a disposable conversation removes its transcript and tentative contributions but preserves previously accepted learning observations. Retained observations identify that the source conversation was deleted; do not secretly retain the transcript. The deletion confirmation must disclose retained understanding. The learner must separately be able to remove retained observations or reset the Subject's understanding record. Exact correction/reset interactions remain to be agreed.
+
+### Round 8 — ongoing recaps, correction, adaptive assessment and deletion
+
+- **Q27 accepted:** Recaps are incremental checkpoints, available on request or offered at meaningful points such as after an assessment, not triggered by an arbitrary message count. Later proposals focus on changes since the last reviewed recap and cannot overwrite accepted observations without review. Ignoring a proposal never blocks conversation.
+- **Q28 accepted:** From the understanding view, learners can correct/save or remove observations and reset the Subject's understanding with confirmation. Removed observations stop informing practice. Reset leaves documents and conversations intact; existing conversations do not automatically rebuild deliberately removed observations, although newly reviewed recaps may contribute again.
+- **Q29 accepted with refinement:** Same-chat assessment is resumable, one question at a time, with optional recorded hint requests, skipping as not-assessed rather than failure, and an inline correctable recap. Three questions must NOT be a hard limit. AI can choose the number and each question's difficulty, considering the learner's available time. Support easy/medium/hard questions; explicit natural-language instructions can request a level, topic or time budget (e.g. easy recap of X, a hard question about Y, or 15 minutes on Z). When difficulty is unspecified, AI may vary it per question. No mastery score or forced timed-exam behaviour was accepted. Exact time-budget handling and evidence interpretation remain to be settled.
+- **Q30 accepted:** Permanent live-app conversation deletion after confirmation, with individual, selected-group, all-in-Subject and all-in-account scope. Show scope/count across unloaded pages; require typing DELETE for account-wide deletion. No first-release trash/restore feature. Disclose retained reviewed understanding and distinguish live-data deletion from provider/back-up retention.
+
+### Round 9 — time budgets, qualified evidence and deletion boundaries
+
+- **Q31 accepted:** Time is a soft assessment budget. Plan/adapt a reasonable sequence and offer a recap near the end, without cutting off answers, auto-submitting or preventing continuation. On returning after the time window, acknowledge expiry and allow continuing or setting a new budget. Do not promise exact timing predictions.
+- **Q32 accepted:** Reviewed observations retain the context of intended question difficulty and requested hints/scaffolding. Easy/medium/hard are AI-estimated task labels, not calibrated ability measurements. A single successful hard answer does not establish mastery; a single struggle does not erase earlier demonstrated understanding.
+- **Q33 accepted:** Learning Document deletion removes its Draft and approved Practice version and excludes it from future source selection, but leaves conversations resumable and reviewed observations intact. Historical references identify the deleted source. Existing messages may retain quotes/discussion; the confirmation explains separate conversation/understanding removal.
+- **Q34 accepted:** Subject deletion removes all its documents/Practice versions, conversations/pending recaps and understanding, including observations retained from previously deleted conversations. Show consequences and require the exact Subject name. Other Subjects, account-level Reference notes, Personal profile and API settings remain intact.
+
+### Round 10 — terminology and state boundaries
+
+- **Q35 accepted:** Canonical term is **Subject understanding**, with **Explore understanding** as the UI entry and the connected-concepts map as its visual representation. Distinct from source-document collections and Personal profile; no separate management workspace. Updated the glossary accordingly.
+- **Q36 accepted:** With no approved study material, chat remains available for goals, organisation and explicitly requested authoring assistance, but do not invent an assessment syllabus or treat that discussion as demonstrated understanding of approved material. Explain how to create/approve a Learning Document. Previously reviewed understanding remains visible even when no current sources remain.
+- **Q37 accepted:** Require saving or discarding outstanding document edits before approving/updating a Practice version. Snapshot the complete successfully saved document, not mixed saved/unsaved state. Draft save and approval remain separate; the existing Practice version remains usable during editing.
+- **Q38 accepted:** Stale corrections, resets and recap applications must not silently overwrite newer Subject understanding or restore removed observations. Retain the proposed text, explain the conflict and require refresh/review against current state; do not silently merge.
+
+### Round 11 — operational boundaries
+
+- **Q39 decided: no backups for the first version.** After clarification, the user explicitly declined backups. Do not build an account-backup export/restore feature, owner backup command, scheduled backup job or backup-management runbook for this release. This does not withdraw ordinary Learning Document copy/download behaviour. Normal durable saves and cross-device continuity remain required. No app-provided disaster recovery is promised; if the live data is damaged or lost, recovery may be impossible. Any incidental provider recovery capability is not an app guarantee. Revisit backups in a later version.
+- **Q40 accepted:** API-key settings are write-only, with replace/remove controls and server-only use after account authorisation. Never return the full stored key or put it in browser storage, prompts, exports or logs. Removal stops future requests without deleting saved work. These minimum safeguards do not make plaintext secure or resolve deferred Q9.
+- **Q41 accepted:** Bound AI work to user-initiated workflows and their associated recap proposals; no scheduled generation, idle analysis or automatic whole-history reprocessing. Apply request/output limits. Do not blindly retry possibly charged interrupted requests in the background; offer explicit retry with a possible additional-charge warning. No guaranteed monthly OpenAI spending cap.
+- **Q42 accepted:** Minimal operational application logging only, without a separate product-analytics service. Request/status/timing/model/usage metadata may be logged; exclude raw conversations, documents, bios, API keys and login codes. Sanitise errors. Do not imply providers retain no metadata.
+- **Q43 accepted:** Prefer compatible European application/database regions where feasible within selected free plans, subject to setup verification. Strict EU-only processing is not required or promised; other providers have their own data handling.
+- **Q44 accepted:** Release requires a real deployed phone walkthrough through OTP login, durable document save/approval, real AI practice, recap review and return continuity. Require regression checks for account isolation, excluded Drafts/Reference notes, stale saves, interrupted replies/retries and deletion/retained-understanding rules. Privacy failures, saved-data loss and broken core flows block release; nonblocking polish may wait.
+
 ## Current interview frontier
 
-First settle whether the first release includes the proposed Subject learning-profile layer and its canonical name, plus the independent explicit trigger for ending a conversation. Then resolve update review/application timing, conversation deletion versus retained learning observations, corrections/reset, and document deletion under this decoupled model. Do not answer those dependent decisions on the user’s behalf.
+All currently identified product/operational interview decisions are settled or explicitly deferred. The user confirmed the shared-understanding checkpoint and explicitly requested committing the planning changes before any `/to-spec` work. Do not start spec synthesis, implementation or provisioning without a further request. No first-version backup feature or app-provided disaster-recovery guarantee. Normal durable saving remains a release requirement. Exact model IDs/API compatibility, region availability and platform limits remain verification work, not facts for the user to research. Q9 remains deferred, with the plaintext exception restricted to the owner pilot; revisit before admitting other users.
 
 Q9 is deliberately deferred, not part of the current interview frontier. Exact manual-save behaviour, deletion/retention rules, selected OpenAI model IDs/API configuration, recovery expectations and test boundaries remain unsettled. A recommendation for a server-only credentials table, write-only key settings, strict authorisation and exclusion from logs/model context is a proposed minimum safeguard, not evidence that plaintext storage is secure.
 

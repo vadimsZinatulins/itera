@@ -17,17 +17,20 @@ User-owned material capturing something the learner is studying within a Subject
 An individually editable portion of a Learning Document, read as rendered Markdown. Blocks have an order and together form the document’s complete Markdown content.
 
 **Subject**:
-An area of study grouping its Learning Documents, learning trail, and practice. Reference notes belong to the learner’s account, not to a Subject.
+An area of study grouping its Learning Documents, learning trail, Subject understanding, and practice. Reference notes belong to the learner’s account, not to a Subject.
 _Avoid_: Notebook (for this grouping)
 
 **Draft**:
-A working Learning Document, or a revision of an approved one, excluded from learning activities and learning-profile interpretation. Saving a Draft is distinct from approving it for practice.
+A working Learning Document, or a revision of an approved one, excluded from learning activities and Subject understanding interpretation. Saving a Draft is distinct from approving it for practice.
 
 **Practice version**:
 The learner-approved version of a Learning Document available for learning activities within its Subject. It remains unchanged while a Draft revision is being written and represents material encountered, not demonstrated understanding.
 
 **Conversation**:
 An account-private exchange within a Subject that may draw on multiple relevant Practice versions and explore the learner’s understanding. It is not owned by a particular Learning Document.
+
+**Subject understanding**:
+A Subject-specific record distinguishing tentative conversation context from learner-reviewed observations of demonstrated understanding and uncertainty. It is provisional rather than a mastery score or a collection of authoritative subject facts.
 
 **Practice recap**:
 A provisional interpretation of a practice conversation that the learner can accept, correct, or dismiss. Only an accepted or learner-corrected recap may guide what to revisit within its Subject; it is not a mastery score or verified fact.
