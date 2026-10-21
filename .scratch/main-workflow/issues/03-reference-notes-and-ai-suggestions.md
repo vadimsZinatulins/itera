@@ -5,6 +5,13 @@ Type: prototype
 Status: open
 Blocked by: none
 
+## User preferences from main-workflow feedback
+
+- Each note is a small, uniformly sized card with a title and short subtitle.
+- Selecting a card opens a large Markdown-content dialog, with Edit and Improve at the top.
+- Use the repo’s configured shadcn/ui styling. On mobile, explore a full-screen dialog.
+- A first interactive preview lives in `app/reference-notes.prototype.tsx`, built while iterating the main workflow. This ticket remains open for its own live evaluation; preferences are not a usability verdict.
+
 ## Question
 
 What mobile-friendly experience makes Reference notes quick to reach, search, and copy from, while clearly separate from practice and learning assessment?
