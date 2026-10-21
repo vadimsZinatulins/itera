@@ -33,3 +33,9 @@ Use the five default triage roles. Before triaging issues, read `docs/agents/tri
 ### Domain docs
 
 Single-context: root `GLOSSARY.md` and `docs/adr/`. Before exploring the codebase, read `docs/agents/domain.md`.
+
+## Reporting rules
+
+### Concise
+
+When reporting information to me, be extremely concise and sacrifice grammar for the sake of concision.

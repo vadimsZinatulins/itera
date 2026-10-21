@@ -4,6 +4,9 @@ node_modules
 .picastle
 .agents
 .scratch
+.local
+test-results
+playwright-report
 .env
 .env.*
 !.env.example
