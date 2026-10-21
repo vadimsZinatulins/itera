@@ -11,4 +11,4 @@ else
     -v "$PWD:/app" -v /app/node_modules \
     itera-learning-profile-prototype npm run dev >/dev/null
 fi
-printf '\nLearning profile study: http://localhost:3001/?variant=B\nA: Record first · B: Conversation + review · C: Learning trail\nStop: docker stop %s\n' "$name"
+printf '\nLearning profile study: http://localhost:3001/?variant=B\nOne Learning Trail. Knowledge views: A: Topic landscape · B: Connected concepts · C: Evidence trail\nStop: docker stop %s\n' "$name"

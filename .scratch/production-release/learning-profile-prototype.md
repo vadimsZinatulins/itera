@@ -1,52 +1,75 @@
-# Subject understanding record — runnable design detour
+# Subject knowledge base — Learning Trail iteration
 
-Status: built for reaction; **no user-validated findings yet**. Not a production implementation or spec.
+Status: v1 rejected; v2 built for reaction. **The new visual representations and update timing are not user-validated.** Not a production implementation or spec.
 
 ## Primary source
 
 - Branch: `prototype/subject-learning-profile`, based on planning checkpoint `3da2541`.
+- Rejected v1 is preserved at commit `f821379` on this branch.
 - Frozen UI reference `prototype/main-workflow` at `51db7f8` is unchanged.
-- Main artifact: `app/learning-profile.prototype.tsx`, mounted in the existing Subject shell.
-- Planning frontier: [Round 6 and unanswered Q22/Q23](planning.md#round-6--document-coupling-rejected-understanding-layer-proposed).
-- The original main-workflow layout study remains reachable with `?study=workflow&variant=B` (its simulated login still applies). The learning-profile detour opens directly without credentials; this bypass is only a design-study affordance.
+- Main artifact: `app/learning-profile.prototype.tsx`, inside the existing Subject shell.
+- Original main-workflow study: `?study=workflow&variant=B` (original simulated login).
+- The detour opens directly without credentials. This is a design-study affordance, not real authentication.
 
-## Run
+## Live feedback on v1
 
-From the repo root:
+The user rejected **all three v1 layouts** as too disjointed. They expected:
+
+- Just **Learning Trail**, not a separate Learning profile workspace.
+- Talking immediately registers a conversation; no separate Start action.
+- Past conversations are visible and can be continued.
+- Conversations plus recaps affect the Subject knowledge base.
+- Some visual representation of the knowledge base; the user is not yet sure what that should be.
+
+This validates the requested interaction direction, **not** v1's Finish gate, manual observation-management workflow, provisional name, deletion defaults or first-release scope. No v1 layout won.
+
+## Run v2
 
 ```sh
 bash scripts/learning-profile.prototype.sh
 ```
 
-Open **http://localhost:3001/?variant=B**. All Node commands, dependencies and the server run inside Docker. The existing server on port 3000 is not replaced.
+Open **http://localhost:3001/?variant=B**. All Node commands, dependencies and the server run inside Docker. Port 3000's original server is not replaced.
 
-- `?variant=A` — Record first: retained understanding leads, exchange sits alongside.
-- `?variant=B` — Conversation + review: exchange and proposed/current record side by side.
-- `?variant=C` — Learning trail: a sequential source → exchange → review → retained-record story.
-- Floating bottom arrows or keyboard left/right switch layouts. Input, textareas and component navigation keep their own arrow behaviour.
-- Layout changes retain in-memory state. Subject switching retains each Subject’s state. Reload/logout resets the demo; this is not production recovery behaviour.
+The conversation shell is identical across variants. Only the knowledge-base representation changes:
 
-## Try this
+- `?variant=A` — **Topic landscape**: equal-status areas with individual conversation dots; no progress bars or mastery levels.
+- `?variant=B` — **Connected concepts**: related Subject ideas with reviewed/tentative/unexplored markers. Links denote conceptual relatedness, not proven ability.
+- `?variant=C` — **Evidence trail**: chronological exchanges and recaps, with direct routes back to the conversation.
 
-1. Start in AI engineering, or switch to Bread making. Each has two synthetic approved sources and a fictional earlier reviewed observation. Mathematics starts without sources or observations.
-2. Open Study material to inspect both approved sources. Drafts, Reference notes and Personal profile are excluded.
-3. Start a short conversation. Type reasoning, or insert the clearly labelled example answer and send it. Replies and proposed interpretations are scripted, **not analysis of typed answers**.
-4. Pause: under the default policy there is no proposal and no retained-record change. Resume, then Finish: completion exposes a proposal but does not apply it.
-5. Compare current and proposed understanding. Correct wording, apply it, or dismiss it. Inspect the retained record and preview later practice. Retained observations can also be corrected, marked uncertain or removed independently.
-6. Delete the conversation using the disclosed confirmation. Default experiment: reviewed observations survive with a transcript-unavailable label; pending proposals do not.
-7. Reset scenario, select the alternate deletion policy in Policy lab, repeat, then delete. This time only observations derived from that conversation disappear. Earlier observations and documents remain.
-8. Optionally compare proposal-on-Pause with proposal-only-on-Finish. Both still require explicit application. Defaults are hypotheses, not approvals.
-9. Expand full relevant state to inspect the exact record, transcript, policies, proposal and eligible/used source IDs.
+Use the floating bottom arrows, or the view buttons inside Explore understanding. Layout switches and Subject switches retain in-memory conversations. Reload resets them.
 
-## Boundaries and deliberate shortcuts
+## Try v2
 
-- Proposed name “Learning profile” remains tentative, distinct from Personal profile.
-- No mastery scores, automatic understanding claims, graph, scheduler, real AI, authentication, storage, services or persistence.
-- Source provenance does not imply document ownership of a conversation or document-coupled cascades.
-- This is one exchange at a time, not a prototype of bulk conversation selection/deletion. Confirmed production bulk-deletion requirements are not withdrawn.
-- Later practice uses a small scripted branch based on retained observations and approved sources; arbitrary correction text is passed visibly as context, not semantically evaluated.
-- This comparison does not settle deletion/privacy/export, evidence retention, completion, first-release scope or timing policies.
+1. Open Learning Trail. Type immediately or insert the study-material example and send it. The first sent message creates a conversation in the history.
+2. Send another message. A small scripted recap appears inline after two learner turns; you can also request one earlier. No Finish or Pause step.
+3. Accept, correct or dismiss the recap inside the conversation. Keep talking in the same thread afterward.
+4. Select a seeded past conversation (Conversations button on mobile) and continue it. Its identity/history remains; it is not copied into a new thread.
+5. Start a new thread, then return to the older one. Unsent text stays with its thread in memory.
+6. Explore understanding from the compact visual beside the trail, or its mobile entry point. Choose an idea, inspect reviewed recaps versus tentative conversation quotes, and jump back to continue an originating conversation.
+7. Compare the three visual forms without resetting the conversation or reopening the modal.
+8. Switch to Bread making for another synthetic scenario. Mathematics starts with no evidence or approved sources; chatting there does not enable a scripted learning recap.
+9. Expand Prototype assumptions & current state to inspect conversation IDs, drafts, recaps, proposals, evidence and approved source IDs.
 
-## Return to planning after live reaction
+## Provisional interpretation rules
 
-Record which layout/elements the user prefers; whether this layer belongs in the first release; its name; the meaning of completion; when proposals appear; whether applying is independent; what deletion should retain; and whether correction/uncertainty controls feel sufficient. Bring those reactions back to `planning.md` before production specification. Do not infer approval from use of demo defaults.
+Conversation contributions appear immediately as **tentative direct quotes**, not inferred mastery. Reviewed recaps form the correctable interpretation used as context for later practice. An unreviewed recap does not replace a reviewed one or guide practice. New discussion after a reviewed recap is identified as newer unreviewed context.
+
+This conservatively preserves the prior reviewed-recap boundary while making the conversation's existence visible in the knowledge-base view. It does **not** settle whether/how automatic conversation analysis should update durable understanding. The user's request that conversations plus recaps affect the record still needs reaction to this concrete version.
+
+## Boundaries and shortcuts
+
+- Scripted replies, recap observations and topic routing only. Arbitrary typed answers/corrections are not semantically evaluated. Seeded history is fictional.
+- Sources provide content; authored or approved material is not evidence of understanding. Drafts, Reference notes and Personal profile remain excluded.
+- No mastery score, graph engine, scheduler, real AI/authentication/backend, persistence or production provisioning.
+- No separate Learning profile tab, Start, Pause, Finish or Apply-observation workflow.
+- No deletion controls in v2: retention/deletion policies remain open, not implicitly settled by their omission. Confirmed individual/group/all production deletion requirements remain.
+- Conversations remain Subject-scoped, never children of a document.
+
+## Validation
+
+Docker-run TypeScript and ESLint checks pass. A temporary browser smoke walkthrough (not added as a test suite) exercised first-message creation, continued past history, automatically offered inline recap, recap acceptance, switching knowledge visualisations without closing/resetting the modal, and mobile conversation selection. No browser runtime errors or mobile horizontal overflow were observed. Desktop and mobile screenshots were inspected.
+
+## Return to planning
+
+Get reactions to the seamless trail, continued conversations, inline recap behaviour and the three visual representations. Ask which representation (if any) makes understanding legible without overstating evidence. Resolve automatic update timing, scope/name and deletion separately after that reaction. Do not treat the revised prototype as accepted just because it was built.

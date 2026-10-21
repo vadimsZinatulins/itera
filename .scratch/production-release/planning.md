@@ -75,11 +75,15 @@ The prototype should make the distinction between approved study material, dispo
 
 ### Runnable detour artifact
 
-Built on throwaway branch `prototype/subject-learning-profile`; frozen `prototype/main-workflow` remains unchanged. See [run instructions, walkthrough and open questions](learning-profile-prototype.md). Three layouts expose completion, review/application and deletion-policy comparisons. **Awaiting live user reaction; no prototype defaults or policy choices are validated decisions.**
+Built on throwaway branch `prototype/subject-learning-profile`; frozen `prototype/main-workflow` remains unchanged. See [run instructions, walkthrough, live feedback and open questions](learning-profile-prototype.md).
+
+**User rejected all v1 layouts** (`f821379`): the experience should be seamless, with just Learning Trail. The first message registers a conversation; past conversations remain visible and continuable. Conversations plus recaps should affect the Subject knowledge base. They also want a visual representation but have not chosen its form. This supersedes the prototype's separate Learning profile workspace and explicit Start/Finish ceremony as the direction to explore; it does not select automatic update/retention semantics or a canonical name.
+
+V2 keeps one conversational trail with inline recaps and compares topic landscape, connected-concept and evidence-trail views. Tentative conversation quotes versus reviewed recap interpretations are an explicit provisional model. **Awaiting reaction to v2; its visuals and interpretation timing are not validated decisions.**
 
 ## Current interview frontier
 
-First settle whether the first release includes the proposed Subject learning-profile layer and its canonical name, plus the independent explicit trigger for ending a conversation. Then resolve update review/application timing, conversation deletion versus retained learning observations, corrections/reset, and document deletion under this decoupled model. Do not answer those dependent decisions on the user’s behalf.
+React to the seamless Learning Trail iteration and explore how the knowledge base can be visualised. The user expects conversations to start from talking and remain continuable; do not reintroduce a mandatory explicit ending step as a prerequisite. Still settle first-release scope, the layer's canonical name, how conversations and reviewed recaps contribute to durable understanding over time, correction, and conversation deletion versus retained understanding. Document deletion must respect the decoupled model. Do not infer those policies from prototype defaults.
 
 Q9 is deliberately deferred, not part of the current interview frontier. Exact manual-save behaviour, deletion/retention rules, selected OpenAI model IDs/API configuration, recovery expectations and test boundaries remain unsettled. A recommendation for a server-only credentials table, write-only key settings, strict authorisation and exclusion from logs/model context is a proposed minimum safeguard, not evidence that plaintext storage is secure.
 
