@@ -1,10 +1,12 @@
 import 'server-only';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { connection } from 'next/server';
 import { authConfig } from './config';
 import { AccountServiceUnavailable, authIsUnavailable } from './availability';
 
 export async function authClient() {
+  await connection();
   const store = await cookies();
   const { url, key, cookieOptions } = authConfig();
   return createServerClient(url, key, {
