@@ -1,6 +1,6 @@
 # Learning Companion
 
-A companion for practising and retaining learning, alongside a personal reference collection.
+A companion for practising and retaining learning, alongside a personal reference collection. All content belongs to one learner account and is private to that account.
 
 ## Language
 
@@ -17,7 +17,7 @@ User-owned material capturing something the learner is studying within a Subject
 An individually editable portion of a Learning Document, read as rendered Markdown. Blocks have an order and together form the document’s complete Markdown content.
 
 **Subject**:
-An area of study grouping its Learning Documents, learning trail, and practice. Reference notes are shared rather than belonging to a Subject.
+An area of study grouping its Learning Documents, learning trail, and practice. Reference notes belong to the learner’s account, not to a Subject.
 _Avoid_: Notebook (for this grouping)
 
 **Draft**:
@@ -25,3 +25,9 @@ A working Learning Document, or a revision of an approved one, excluded from lea
 
 **Practice version**:
 The learner-approved version of a Learning Document available for learning activities within its Subject. It remains unchanged while a Draft revision is being written and represents material encountered, not demonstrated understanding.
+
+**Conversation**:
+An account-private exchange within a Subject that may draw on multiple relevant Practice versions and explore the learner’s understanding. It is not owned by a particular Learning Document.
+
+**Practice recap**:
+A provisional interpretation of a practice conversation that the learner can accept, correct, or dismiss. Only an accepted or learner-corrected recap may guide what to revisit within its Subject; it is not a mastery score or verified fact.
