@@ -30,6 +30,9 @@ test('save ordered Drafts across sessions and reject stale writes', async ({ pag
     await second.getByRole('button', { name: 'Save as Draft', exact: true }).click();
     await expect(second.getByRole('alert').filter({ hasText: 'newer' })).toBeVisible();
     await expect(second.getByText('Older session attempted text', { exact: true })).toBeVisible();
+    await second.getByRole('button', { name: 'Refresh and review saved version', exact: true }).click();
+    await expect(second.getByText('Newer saved text', { exact: true })).toBeVisible();
+    await expect(second.getByText('Older session attempted text', { exact: true })).toBeVisible();
     await page.reload();
     await page.getByRole('button', { name: 'Open Motion', exact: true }).click();
     await expect(page.getByText('Newer saved text', { exact: true })).toBeVisible();
