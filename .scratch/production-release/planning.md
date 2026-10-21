@@ -1,6 +1,6 @@
 # First production release — planning discussion
 
-Status: shared understanding confirmed; interview complete; spec synthesis explicitly paused
+Status: interview complete; shared understanding and testing seam confirmed; spec published
 
 ## Purpose
 
@@ -123,11 +123,13 @@ Q22/Q23 must not be repeated as if the v1 separate workspace and explicit Finish
 - **Q43 accepted:** Prefer compatible European application/database regions where feasible within selected free plans, subject to setup verification. Strict EU-only processing is not required or promised; other providers have their own data handling.
 - **Q44 accepted:** Release requires a real deployed phone walkthrough through OTP login, durable document save/approval, real AI practice, recap review and return continuity. Require regression checks for account isolation, excluded Drafts/Reference notes, stale saves, interrupted replies/retries and deletion/retained-understanding rules. Privacy failures, saved-data loss and broken core flows block release; nonblocking polish may wait.
 
-## Current interview frontier
+## Spec synthesis and testing checkpoint
 
-All currently identified product/operational interview decisions are settled or explicitly deferred. The user confirmed the shared-understanding checkpoint and explicitly requested committing the planning changes before any `/to-spec` work. Do not start spec synthesis, implementation or provisioning without a further request. No first-version backup feature or app-provided disaster-recovery guarantee. Normal durable saving remains a release requirement. Exact model IDs/API compatibility, region availability and platform limits remain verification work, not facts for the user to research. Q9 remains deferred, with the plaintext exception restricted to the owner pilot; revisit before admitting other users.
+After the planning checkpoint and agent-instruction commits, the user explicitly requested `/to-spec`. They confirmed the proposed primary test seam: the running application's public boundary, using browser workflows and direct public application/data requests, with real test persistence/auth/storage and controlled OpenAI/email effects. The deployed real-email/OpenAI phone walkthrough remains a separate release gate. Full testing decisions are recorded in the [published first-release spec](spec.md), marked `ready-for-agent`.
 
-Q9 is deliberately deferred, not part of the current interview frontier. Exact manual-save behaviour, deletion/retention rules, selected OpenAI model IDs/API configuration, recovery expectations and test boundaries remain unsettled. A recommendation for a server-only credentials table, write-only key settings, strict authorisation and exclusion from logs/model context is a proposed minimum safeguard, not evidence that plaintext storage is secure.
+All currently identified product/operational interview decisions are settled or explicitly deferred. The published spec is the synthesis for ticketing; this planning document retains the decision history. No implementation or provisioning has started or been authorised by spec publication. No first-version backup feature or app-provided disaster-recovery guarantee. Normal durable saving remains a release requirement. Exact model IDs/API compatibility, region availability and platform limits remain implementation verification work, not facts for the user to research.
+
+Q9 remains explicitly deferred, with the plaintext exception restricted to the owner pilot; revisit before admitting other real users. Server-only credential use, write-only settings, authorisation and exclusion from prompts/logs/browser storage are accepted minimum safeguards under Q40, not evidence that plaintext storage is secure.
 
 Completed the bounded follow-up research and captured [Free email delivery and OpenAI API findings](research/free-email-and-openai.md). Q9 was not investigated. Findings did not themselves authorise provisioning or settle Q12/Q13; the subsequent user answers above selected the stack and established existing domain/Resend access.
 
