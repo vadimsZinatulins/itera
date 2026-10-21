@@ -35,7 +35,7 @@ case "$COMMAND" in
     docker run --rm -v "$ROOT:$ROOT" --entrypoint node "$TOOLS" \
       "$ROOT/scripts/local-env.mjs" "$ROOT/.local/status.json" "$ROOT/.local" "$PROJECT" "$ORIGIN"
     rm -f .local/status.json
-    echo 'Local Supabase started. Inbox: http://localhost:55424. Run scripts/local.sh dev.'
+    echo 'Local Supabase started. Studio: http://localhost:55423. Inbox: http://localhost:55424. Run scripts/local.sh dev.'
     ;;
   stop)
     WORKDIR=$ROOT
@@ -84,7 +84,7 @@ case "$COMMAND" in
     docker build --target test -t itera-owner-test .
     docker build --target production -t itera-owner-production .
     network
-    cli start --network-id "$PROJECT" > "$WORKDIR/start.log" 2>&1 || { echo "Start failed; inspect $WORKDIR/start.log before cleanup."; exit 1; }
+    cli start --network-id "$PROJECT" --exclude studio,postgres-meta > "$WORKDIR/start.log" 2>&1 || { echo "Start failed; inspect $WORKDIR/start.log before cleanup."; exit 1; }
     cli db reset --local --network-id "$PROJECT" > "$WORKDIR/reset.log" 2>&1
     make_env
     docker run -d --name "$UPSTREAM" --network "$PROJECT" --network-alias upstream.test \

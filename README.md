@@ -7,7 +7,7 @@ A private companion for practising and retaining learning. Production work start
 **All Node tooling and browser automation run inside Docker.** Docker Compose and host Node/npm are not required.
 
 ```sh
-scripts/local.sh start                   # local Supabase CLI services
+scripts/local.sh start                   # local Supabase; Studio: http://localhost:55423
 scripts/local.sh dev                     # application: http://localhost:3100
 scripts/local.sh stop                    # preserve local development data
 scripts/local.sh test tests/sign-in.spec.ts

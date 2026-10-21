@@ -16,7 +16,9 @@ major_version = 17
 enabled = false
 
 [studio]
-enabled = false
+enabled = true
+port = 55423
+api_url = "http://127.0.0.1:55421"
 
 [local_smtp]
 enabled = true
