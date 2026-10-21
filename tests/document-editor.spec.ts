@@ -7,6 +7,7 @@ test('rendered-first editor, order, undo, saved output, navigation guard and fai
   try {
     await browserSignIn(page, account.email);
     const subject = await (await page.request.post('/api/subjects', { headers: { origin }, data: { name: 'Writing' } })).json();
+    await page.request.post('/api/subjects', { headers: { origin }, data: { name: 'Another Subject' } });
     await page.goto(`/?subject=${subject.id}`);
     await page.getByRole('button', { name: 'New Learning Document', exact: true }).click();
     await page.getByLabel('Document title', { exact: true }).fill('My learning');
@@ -23,7 +24,7 @@ test('rendered-first editor, order, undo, saved output, navigation guard and fai
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'First', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Insert block before block 1', exact: true }).click();
-    await page.getByLabel('Block 1 Markdown').fill('Second block');
+    await page.getByLabel('Block 1 Markdown').fill('Second block\n\n    const answer = 42;');
     await page.getByRole('button', { name: 'Save block', exact: true }).click();
     await page.getByRole('article', { name: 'Block 1', exact: true }).hover();
     await page.getByRole('button', { name: 'Move block 1 down', exact: true }).click();
@@ -31,6 +32,14 @@ test('rendered-first editor, order, undo, saved output, navigation guard and fai
     await expect(page.getByRole('heading', { name: 'First', exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Undo delete', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'First', exact: true })).toBeVisible();
+    page.once('dialog', dialog => dialog.dismiss());
+    await page.getByRole('button', { name: 'Switch subject', exact: true }).click();
+    await page.getByRole('menuitemradio', { name: 'Another Subject', exact: true }).click();
+    await expect(page.getByLabel('Document title', { exact: true })).toHaveValue('My learning');
+    await page.keyboard.press('Escape');
+    page.once('dialog', dialog => dialog.dismiss());
+    await page.getByRole('button', { name: 'Log out', exact: true }).click();
+    await expect(page.getByLabel('Document title', { exact: true })).toHaveValue('My learning');
     page.once('dialog', dialog => dialog.dismiss());
     await page.getByRole('button', { name: 'All Learning Documents', exact: true }).click();
     await expect(page.getByLabel('Document title', { exact: true })).toHaveValue('My learning');
@@ -50,7 +59,7 @@ test('rendered-first editor, order, undo, saved output, navigation guard and fai
     await page.getByLabel('Document title', { exact: true }).fill('Unsaved title');
     await page.getByRole('button', { name: 'Final Markdown', exact: true }).click();
     const dialog = page.getByRole('dialog');
-    const expected = '# My learning\n\nNotes to reuse\n\n## First\n\n**Bold idea**\n\nSecond block\n';
+    const expected = '# My learning\n\nNotes to reuse\n\n## First\n\n**Bold idea**\n\nSecond block\n\n    const answer = 42;\n';
     await expect(dialog.locator('pre')).toHaveText(expected);
     const download = page.waitForEvent('download');
     await dialog.getByRole('button', { name: 'Download .md', exact: true }).click();
@@ -67,6 +76,7 @@ test('rendered-first editor, order, undo, saved output, navigation guard and fai
     await expect(page.getByLabel('Document title', { exact: true })).toHaveValue('My learning');
     await page.getByRole('button', { name: 'Document preview', exact: true }).click();
     await expect(page.getByRole('dialog').getByRole('heading', { name: 'First', exact: true })).toBeVisible();
+    await expect(page.getByRole('dialog').locator('pre code')).toHaveText('const answer = 42;\n');
     await page.keyboard.press('Escape');
     await page.reload();
     await page.getByRole('button', { name: 'Open My learning', exact: true }).click();

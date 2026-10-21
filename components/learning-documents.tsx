@@ -12,17 +12,27 @@ import { documentId } from '@/lib/document-id';
 type Block = { id: string; markdown: string };
 type Draft = { id: string; subject_id: string; revision: number; title: string; description: string; blocks: Block[] };
 function assembled(doc: Draft) {
-  return [`# ${doc.title.trim() || 'Untitled Learning Document'}`, doc.description.trim(), ...doc.blocks.map(b => b.markdown.trim())].filter(Boolean).join('\n\n') + '\n';
+  return [`# ${doc.title.trim() || 'Untitled Learning Document'}`, doc.description, ...doc.blocks.map(b => b.markdown)].filter(Boolean).join('\n\n') + '\n';
 }
 function Markdown({ children }: { children: string }) {
   return <div className={`${s.markdown} break-words`}><ReactMarkdown>{children}</ReactMarkdown></div>;
 }
 
+type SessionEdits = { draft: Draft | null; saved: Draft | null; editing: Record<string, string> };
+
+// Lives only in the account's mounted page, not browser storage. Subject history
+// navigation can remount an editor without destroying its outstanding buffers.
 export default function LearningDocuments({ subjectId }: { subjectId: string }) {
+  const [sessions] = useState(() => new Map<string, SessionEdits>());
+  return <DocumentWorkspace key={subjectId} subjectId={subjectId} sessions={sessions} />;
+}
+
+function DocumentWorkspace({ subjectId, sessions }: { subjectId: string; sessions: Map<string, SessionEdits> }) {
+  const initial = sessions.get(subjectId);
   const [documents, setDocuments] = useState<Draft[]>([]);
-  const [draft, setDraft] = useState<Draft | null>(null);
-  const [saved, setSaved] = useState<Draft | null>(null);
-  const [editing, setEditing] = useState<Record<string, string>>({});
+  const [draft, setDraft] = useState<Draft | null>(initial?.draft ?? null);
+  const [saved, setSaved] = useState<Draft | null>(initial?.saved ?? null);
+  const [editing, setEditing] = useState<Record<string, string>>(initial?.editing ?? {});
   const [removed, setRemoved] = useState<{ block: Block; index: number } | null>(null);
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
@@ -33,6 +43,7 @@ export default function LearningDocuments({ subjectId }: { subjectId: string }) 
   const [newer, setNewer] = useState<Draft | null>(null);
   const dirty = !!draft && (Object.keys(editing).length > 0 || JSON.stringify(draft) !== JSON.stringify(saved));
 
+  useEffect(() => { sessions.set(subjectId, { draft, saved, editing }); }, [sessions, subjectId, draft, saved, editing]);
   useEffect(() => {
     let active = true;
     fetch(`/api/documents?subject=${subjectId}`).then(async response => {
@@ -47,12 +58,14 @@ export default function LearningDocuments({ subjectId }: { subjectId: string }) 
     if (!dirty) return;
     const unload = (event: BeforeUnloadEvent) => { event.preventDefault(); };
     const navigation = (event: Event) => {
-      if (!window.confirm('Discard unsaved document edits and leave? Cancel to stay and save your Draft.')) event.preventDefault();
+      if (busy || !window.confirm('Discard unsaved document edits and leave? Cancel to stay and save your Draft.')) { event.preventDefault(); return; }
+      sessions.delete(subjectId);
+      setDraft(saved); setEditing({});
     };
     window.addEventListener('beforeunload', unload);
     window.addEventListener('document-navigation', navigation);
     return () => { window.removeEventListener('beforeunload', unload); window.removeEventListener('document-navigation', navigation); };
-  }, [dirty]);
+  }, [dirty, busy, saved, sessions, subjectId]);
   function leave() { return !dirty || window.confirm('Discard unsaved document edits? Cancel to stay and save your Draft.'); }
   function open(doc: Draft) { setDraft(doc); setSaved(doc.revision ? doc : null); setEditing({}); setRemoved(null); setError(''); setStatus(doc.revision ? 'Saved on server · Draft' : 'Unsaved local edits'); setNewer(null); }
   function blocks(value: Block[]) { if (draft) setDraft({ ...draft, blocks: value }); }
