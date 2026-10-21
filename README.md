@@ -1,36 +1,27 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Learning Companion
 
-## Getting Started
+A private companion for practising and retaining learning. Production work starts with externally provisioned learner accounts and email-code sign-in. Public signup is disabled. Subject, Learning Document and practice features follow in later issues.
 
-First, run the development server:
+## Development and tests
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+**All Node tooling and browser automation run inside Docker.** Docker Compose and host Node/npm are not required.
+
+```sh
+scripts/local.sh start                   # local Supabase CLI services
+scripts/local.sh dev                     # application: http://localhost:3100
+scripts/local.sh stop                    # preserve local development data
+scripts/local.sh test tests/sign-in.spec.ts
+scripts/local.sh test                    # full public-boundary suite (~4 minutes)
+scripts/local.sh check                   # typecheck + lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Tests create synthetic accounts, use real local Auth/Postgres/RLS plus a controlled email inbox, and run the standalone production application in Docker. The test run removes only its own services and data. Do not use production credentials in local tests.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+See [authentication and setup](docs/authentication.md) for account provisioning, local email, runtime configuration, test isolation, free-plan limits and release checks. No deployment or live provisioning has been performed.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## References
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `GLOSSARY.md`: domain language.
+- `prototype/main-workflow`: prototype design reference, not production authentication.
+- `docs/production-plan`: accepted plan, architecture decision and issue specifications.
+- [Dockerized Supabase CLI research](.scratch/production-release/research/supabase-cli-in-docker.md).

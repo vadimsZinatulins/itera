@@ -1,0 +1,61 @@
+# Local-only configuration. Hosted Auth must be configured separately (docs/authentication.md).
+project_id = "itera-owner-local"
+
+[api]
+port = 55421
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+auto_expose_new_tables = false
+
+[db]
+port = 55422
+shadow_port = 55420
+major_version = 17
+
+[db.seed]
+enabled = false
+
+[studio]
+enabled = false
+
+[local_smtp]
+enabled = true
+port = 55424
+
+[auth]
+site_url = "http://localhost:3100"
+additional_redirect_urls = []
+enable_signup = false
+enable_anonymous_sign_ins = false
+# Must exceed supabase-js's 90-second proactive refresh margin.
+jwt_expiry = 120
+
+[auth.rate_limit]
+email_sent = 1000
+sign_in_sign_ups = 1000
+token_verifications = 1000
+token_refresh = 1000
+
+[auth.email]
+# This enables the email provider; global auth.enable_signup remains false.
+enable_signup = true
+enable_confirmations = true
+max_frequency = "2s"
+otp_length = 6
+otp_expiry = 60
+
+[auth.email.template.magic_link]
+subject = "Sign in to Learning Companion"
+content_path = "./supabase/templates/code.html"
+
+[storage]
+enabled = false
+
+[realtime]
+enabled = false
+
+[edge_runtime]
+enabled = false
+
+[analytics]
+enabled = false
