@@ -6,7 +6,7 @@
 
 **Status:** implemented locally; external setup and deployed release checks remain
 
-**Evidence:** `docs/authentication.md`, `scripts/local.sh test` (10 public-boundary tests), Docker typecheck/lint and standalone production build. No live provisioning, secrets collection, purchases or deployment performed. The email-delivery/hosted-configuration checks in the guide remain release gates.
+**Evidence:** `docs/authentication.md`, `scripts/local.sh test` (11 public-boundary tests), Docker typecheck/lint and standalone production build. No live provisioning, secrets collection, purchases or deployment performed. The email-delivery/hosted-configuration checks in the guide remain release gates.
 
 - [x] The provisioned account can request and verify an email code, correct its email, request another code, and recover from invalid/expired codes and delivery/rate-limit errors. Do not copy simulated OTP generation or invalidation assumptions; verify provider behaviour.
 - [x] Public signup and automatic user creation through login are disabled. Production UI/logs never display verification codes, use a hard-coded email as authentication, or expose demo bypasses.

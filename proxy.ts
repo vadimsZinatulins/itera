@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { authConfig } from './lib/auth/config';
+import { authIsUnavailable } from './lib/auth/availability';
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -16,8 +17,8 @@ export async function proxy(request: NextRequest) {
       },
     },
   });
-  const { data: { user } } = await client.auth.getUser();
-  if (!user && request.nextUrl.pathname === '/') {
+  const { data: { user }, error } = await client.auth.getUser();
+  if (!user && !authIsUnavailable(error) && request.nextUrl.pathname === '/') {
     const redirect = NextResponse.redirect(new URL('/login', request.url));
     response.cookies.getAll().forEach(cookie => redirect.cookies.set(cookie));
     response = redirect;
