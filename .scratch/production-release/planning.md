@@ -73,6 +73,10 @@ The latest unanswered proposals are **Q22** (include a minimal Subject-specific 
 
 The prototype should make the distinction between approved study material, disposable conversations, and a durable understanding record tangible. It should expose the effects of finishing, reviewing/applying an update, and deleting a conversation. Whether the understanding record survives that deletion is deliberately unsettled. Return user-validated findings to this discussion before resuming the production spec.
 
+### Runnable detour artifact
+
+Built on throwaway branch `prototype/subject-learning-profile`; frozen `prototype/main-workflow` remains unchanged. See [run instructions, walkthrough and open questions](learning-profile-prototype.md). Three layouts expose completion, review/application and deletion-policy comparisons. **Awaiting live user reaction; no prototype defaults or policy choices are validated decisions.**
+
 ## Current interview frontier
 
 First settle whether the first release includes the proposed Subject learning-profile layer and its canonical name, plus the independent explicit trigger for ending a conversation. Then resolve update review/application timing, conversation deletion versus retained learning observations, corrections/reset, and document deletion under this decoupled model. Do not answer those dependent decisions on the user’s behalf.
