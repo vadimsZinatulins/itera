@@ -8,6 +8,18 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
+## Docker-only Node tooling
+
+- **Run all Node-related tooling inside Docker. Never run it on the host**, directly or through scripts or Git hooks. This includes `node`, `npm`, `npx`, other JavaScript runtimes/package managers, Next.js commands, dependency installs, builds, linting, type checks, tests, and Node-based browser automation.
+- Start and stop the Next.js app through Docker. Use host-side `docker` commands to build, run, execute commands in, and stop containers; execute application/tooling commands inside the container.
+- Use the existing `Dockerfile` and update it as needed. If Docker is unavailable, report the blocker; never fall back to host-side Node tooling.
+
+## Prototype and live planning references
+
+- **Prototype — `prototype/main-workflow`:** contains the project prototype and can be freely inspected. Consult it when designing or implementing workflows and UI. It is a design reference, not production-ready code.
+- **Live documentation — `docs/production-plan`:** contains the evolving production plan. Before changing product behaviour, domain concepts, or architecture, consult the relevant planning notes under `.scratch/production-release/`, `GLOSSARY.md`, and `docs/adr/` on this branch. Distinguish confirmed decisions from proposals and explicit deferrals; the documentation can change.
+- Read another branch with `git show <branch>:<path>` or a separate worktree when needed. Do not switch away from the current working branch merely to inspect a reference.
+
 ## Agent skills
 
 ### Issue tracker
