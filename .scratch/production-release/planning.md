@@ -79,7 +79,7 @@ Built on throwaway branch `prototype/subject-learning-profile`; frozen `prototyp
 
 **User rejected all v1 layouts** (`f821379`): the experience should be seamless, with just Learning Trail. The first message registers a conversation; past conversations remain visible and continuable. Conversations plus recaps should affect the Subject knowledge base. They also want a visual representation but have not chosen its form. This supersedes the prototype's separate Learning profile workspace and explicit Start/Finish ceremony as the direction to explore; it does not select automatic update/retention semantics or a canonical name.
 
-V2 keeps one conversational trail with inline recaps and compares topic landscape, connected-concept and evidence-trail views. Tentative conversation quotes versus reviewed recap interpretations are an explicit provisional model. **Awaiting reaction to v2; its visuals and interpretation timing are not validated decisions.**
+V2 keeps one conversational trail with inline recaps and compares topic landscape, connected-concept and evidence-trail views. Tentative conversation quotes versus reviewed recap interpretations are an explicit provisional model. The user **prefers B (connected concepts)** and requests the missing proactive practice entry points: proposed open threads and a quick-assessment button, with assessment allowed inside the same chat. V3 restores those entries and a resumable scripted three-question assessment with an inline correctable recap. **Awaiting reaction to the assessment flow; interpretation timing and assessment defaults remain provisional.**
 
 ## Current interview frontier
 

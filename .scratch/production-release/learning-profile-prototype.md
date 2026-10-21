@@ -1,6 +1,6 @@
 # Subject knowledge base — Learning Trail iteration
 
-Status: v1 rejected; v2 built for reaction. **The new visual representations and update timing are not user-validated.** Not a production implementation or spec.
+Status: v1 rejected; user prefers **B (connected concepts)** in v2. V3 restores proposed open threads and quick assessment. Assessment behaviour and automatic update timing still await reaction. Not a production implementation or spec.
 
 ## Primary source
 
@@ -23,7 +23,20 @@ The user rejected **all three v1 layouts** as too disjointed. They expected:
 
 This validates the requested interaction direction, **not** v1's Finish gate, manual observation-management workflow, provisional name, deletion defaults or first-release scope. No v1 layout won.
 
-## Run v2
+## Live feedback on v2 and the v3 addition
+
+The user most likes **B**, but points out that the knowledge-assessment entry points were lost: they want proposed open threads plus a quick-assessment button, and are happy for assessment to happen in the chat window.
+
+V3 keeps B as the default and adds:
+
+- Two suggested open threads in the new-chat view, with reasons derived from approved material and reviewed/unreviewed evidence. Open threads is also reachable beside the composer while a conversation is selected.
+- **Quick assessment**, always reachable beside the composer: a scripted three-question check-in, one question at a time, across the three sample concepts. It uses the two approved sample sources in AI engineering or Bread making; other Subjects have ordinary chat but this scripted assessment is disabled.
+- The button becomes **Continue assessment** if one is unfinished. Switching away and returning preserves question progress and unsent text in memory; there is still no mandatory Finish action.
+- An optional Hint recorded with that answer. Opening a question alone adds no understanding evidence; answering contributes tentative context.
+- After three answers, an inline recap is proposed. Accept/correct/dismiss works as in ordinary conversation. A reviewed recap connects to each concept covered by the answers, and explicitly avoids treating hinted reasoning as independent evidence.
+- The question counter shows activity progress, not knowledge level. Interpretation remains scripted, not real answer evaluation; no scores.
+
+## Run v3
 
 ```sh
 bash scripts/learning-profile.prototype.sh
@@ -31,7 +44,7 @@ bash scripts/learning-profile.prototype.sh
 
 Open **http://localhost:3001/?variant=B**. All Node commands, dependencies and the server run inside Docker. Port 3000's original server is not replaced.
 
-The conversation shell is identical across variants. Only the knowledge-base representation changes:
+**B is the user's preferred representation.** The conversation shell is identical across variants. Only the knowledge-base representation changes:
 
 - `?variant=A` — **Topic landscape**: equal-status areas with individual conversation dots; no progress bars or mastery levels.
 - `?variant=B` — **Connected concepts**: related Subject ideas with reviewed/tentative/unexplored markers. Links denote conceptual relatedness, not proven ability.
@@ -68,8 +81,8 @@ This conservatively preserves the prior reviewed-recap boundary while making the
 
 ## Validation
 
-Docker-run TypeScript and ESLint checks pass. A temporary browser smoke walkthrough (not added as a test suite) exercised first-message creation, continued past history, automatically offered inline recap, recap acceptance, switching knowledge visualisations without closing/resetting the modal, and mobile conversation selection. No browser runtime errors or mobile horizontal overflow were observed. Desktop and mobile screenshots were inspected.
+Docker-run TypeScript and ESLint checks pass. A temporary browser smoke walkthrough (not added as a test suite) exercised first-message creation, continued past history, automatically offered inline recap, recap acceptance, switching knowledge visualisations without closing/resetting the modal, and mobile conversation selection. No browser runtime errors or mobile horizontal overflow were observed. Desktop and mobile screenshots were inspected. V3's temporary browser smoke also covered suggested-thread entry, three-question assessment, hint tracking, no evidence from simply opening an assessment, continuation after switching away, correction of the resulting recap, and reviewed evidence appearing across the connected concepts.
 
 ## Return to planning
 
-Get reactions to the seamless trail, continued conversations, inline recap behaviour and the three visual representations. Ask which representation (if any) makes understanding legible without overstating evidence. Resolve automatic update timing, scope/name and deletion separately after that reaction. Do not treat the revised prototype as accepted just because it was built.
+B (connected concepts) is the preferred visual direction. Get reactions to the restored open threads, quick-assessment entry and question/recap flow. Resolve automatic update timing, scope/name and deletion separately. Do not treat assessment defaults or evidence semantics as accepted merely because the requested entry points were restored.
