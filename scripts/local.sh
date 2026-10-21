@@ -58,10 +58,11 @@ case "$COMMAND" in
     WORKDIR="$ROOT/.local/$PROJECT"
     ORIGIN=http://app.test:3000
     APP="$PROJECT-app"
+    UPSTREAM="$PROJECT-upstream"
     cleanup() {
       code=$?
       trap - EXIT
-      docker rm -f "$APP" >/dev/null 2>&1 || true
+      docker rm -f "$APP" "$UPSTREAM" >/dev/null 2>&1 || true
       if docker image inspect "$TOOLS" >/dev/null 2>&1; then
         cli stop --no-backup --project-id "$PROJECT" > "$WORKDIR/stop.log" 2>&1 || echo "Warning: cleanup failed for $PROJECT; see $WORKDIR/stop.log" >&2
       fi
@@ -86,6 +87,9 @@ case "$COMMAND" in
     cli start --network-id "$PROJECT" > "$WORKDIR/start.log" 2>&1 || { echo "Start failed; inspect $WORKDIR/start.log before cleanup."; exit 1; }
     cli db reset --local --network-id "$PROJECT" > "$WORKDIR/reset.log" 2>&1
     make_env
+    docker run -d --name "$UPSTREAM" --network "$PROJECT" --network-alias upstream.test \
+      -e TEST_UPSTREAM_URL="http://supabase_kong_$PROJECT:8000" \
+      itera-owner-test node tests/auth-upstream.mjs >/dev/null
     docker run -d --name "$APP" --network "$PROJECT" --network-alias app.test \
       --env-file "$WORKDIR/app.env" itera-owner-production >/dev/null
     docker run --rm --network "$PROJECT" --env-file "$WORKDIR/test.env" \

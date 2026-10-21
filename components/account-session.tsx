@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 
 function clearAccountState() {
@@ -18,24 +18,26 @@ function clearAccountState() {
 export default function AccountSession() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [unavailable, setUnavailable] = useState(false);
+  const check = useCallback(async () => {
+    if (document.visibilityState !== 'visible') return;
+    try {
+      const response = await fetch('/api/account', { cache: 'no-store' });
+      if (response.status === 401) { clearAccountState(); window.location.replace('/login'); }
+      else setUnavailable(!response.ok);
+    } catch { setUnavailable(true); }
+  }, []);
   useEffect(() => {
     const channel = new BroadcastChannel('learning-companion:session');
     channel.onmessage = () => { clearAccountState(); window.location.replace('/login'); };
     // Revalidate on return, including a browser back/forward-cache restore.
-    const check = async () => {
-      if (document.visibilityState !== 'visible') return;
-      try {
-        const response = await fetch('/api/account', { cache: 'no-store' });
-        if (response.status === 401) { clearAccountState(); window.location.replace('/login'); }
-      } catch { /* A connection failure is not proof of logout. */ }
-    };
     window.addEventListener('pageshow', check);
     document.addEventListener('visibilitychange', check);
     return () => {
       channel.close(); window.removeEventListener('pageshow', check);
       document.removeEventListener('visibilitychange', check);
     };
-  }, []);
+  }, [check]);
 
   async function logout() {
     setBusy(true); setError('');
@@ -49,5 +51,5 @@ export default function AccountSession() {
     } catch { setError('Could not connect. Try again.'); }
     finally { setBusy(false); }
   }
-  return <div><Button variant="outline" className="min-h-11" disabled={busy} onClick={() => void logout()}>{busy ? 'Logging out…' : 'Log out'}</Button>{error && <p role="alert" className="mt-2 text-sm">{error}</p>}</div>;
+  return <div><Button variant="outline" className="min-h-11" disabled={busy} onClick={() => void logout()}>{busy ? 'Logging out…' : 'Log out'}</Button>{error && <p role="alert" aria-label="Account status" className="mt-2 text-sm">{error}</p>}{unavailable && <div><p role="alert" aria-label="Account status" className="mt-2 text-sm">Account service is temporarily unavailable. Your local work is unchanged.</p><Button variant="ghost" className="min-h-11" onClick={() => void check()}>Try again</Button></div>}</div>;
 }
