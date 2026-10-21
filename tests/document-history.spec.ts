@@ -17,9 +17,23 @@ test('browser Back/Forward preserves outstanding Subject Draft and open block te
     await page.getByLabel('Block 1 Markdown').fill('Text not even saved to the local block yet');
     await page.goBack();
     await expect(page.getByRole('heading', { name: 'First Subject', exact: true })).toBeVisible();
+    const logoutWarning = page.waitForEvent('dialog');
+    const logout = page.getByRole('button', { name: 'Log out', exact: true }).click();
+    const warning = await logoutWarning;
+    expect(warning.message()).toContain('unsaved');
+    await warning.dismiss();
+    await logout;
+    await expect(page.getByRole('heading', { name: 'First Subject', exact: true })).toBeVisible();
     await page.goForward();
     await expect(page.getByLabel('Document title', { exact: true })).toHaveValue('Outstanding title');
     await expect(page.getByLabel('Block 1 Markdown')).toHaveValue('Text not even saved to the local block yet');
     await expect(page.getByRole('status')).toContainText('Unsaved local edits');
+    await page.goBack();
+    await expect(page.getByRole('heading', { name: 'First Subject', exact: true })).toBeVisible();
+    const reloadWarning = page.waitForEvent('dialog');
+    void page.reload().catch(() => null); // A cancelled reload need not complete its navigation promise.
+    const unload = await reloadWarning;
+    expect(unload.type()).toBe('beforeunload');
+    await unload.dismiss();
   } finally { await admin().auth.admin.deleteUser(account.id); }
 });

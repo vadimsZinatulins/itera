@@ -18,12 +18,30 @@ function Markdown({ children }: { children: string }) {
   return <div className={`${s.markdown} break-words`}><ReactMarkdown>{children}</ReactMarkdown></div>;
 }
 
-type SessionEdits = { draft: Draft | null; saved: Draft | null; editing: Record<string, string> };
+type SessionEdits = { draft: Draft | null; saved: Draft | null; editing: Record<string, string>; busy: boolean };
+function hasUnsavedEdits(session: SessionEdits) {
+  return !!session.draft && (Object.keys(session.editing).length > 0 || JSON.stringify(session.draft) !== JSON.stringify(session.saved));
+}
 
 // Lives only in the account's mounted page, not browser storage. Subject history
 // navigation can remount an editor without destroying its outstanding buffers.
 export default function LearningDocuments({ subjectId }: { subjectId: string }) {
   const [sessions] = useState(() => new Map<string, SessionEdits>());
+  useEffect(() => {
+    const hasEdits = () => [...sessions.values()].some(hasUnsavedEdits);
+    const unload = (event: BeforeUnloadEvent) => { if (hasEdits()) event.preventDefault(); };
+    const navigation = (event: Event) => {
+      if (!hasEdits()) return;
+      if ([...sessions.values()].some(session => session.busy) || !window.confirm('Discard unsaved document edits in all Subjects and leave? Cancel to return and save your Drafts.')) {
+        event.preventDefault(); return;
+      }
+      for (const [id, session] of sessions) sessions.set(id, { ...session, draft: session.saved, editing: {} });
+      window.dispatchEvent(new Event('document-discard'));
+    };
+    window.addEventListener('beforeunload', unload);
+    window.addEventListener('document-navigation', navigation);
+    return () => { window.removeEventListener('beforeunload', unload); window.removeEventListener('document-navigation', navigation); };
+  }, [sessions]);
   return <DocumentWorkspace key={subjectId} subjectId={subjectId} sessions={sessions} />;
 }
 
@@ -41,9 +59,9 @@ function DocumentWorkspace({ subjectId, sessions }: { subjectId: string; session
   const [status, setStatus] = useState('');
   const [output, setOutput] = useState<'preview' | 'markdown' | null>(null);
   const [newer, setNewer] = useState<Draft | null>(null);
-  const dirty = !!draft && (Object.keys(editing).length > 0 || JSON.stringify(draft) !== JSON.stringify(saved));
+  const dirty = hasUnsavedEdits({ draft, saved, editing, busy });
 
-  useEffect(() => { sessions.set(subjectId, { draft, saved, editing }); }, [sessions, subjectId, draft, saved, editing]);
+  useEffect(() => { sessions.set(subjectId, { draft, saved, editing, busy }); }, [sessions, subjectId, draft, saved, editing, busy]);
   useEffect(() => {
     let active = true;
     fetch(`/api/documents?subject=${subjectId}`).then(async response => {
@@ -55,17 +73,10 @@ function DocumentWorkspace({ subjectId, sessions }: { subjectId: string; session
     return () => { active = false; };
   }, [subjectId]);
   useEffect(() => {
-    if (!dirty) return;
-    const unload = (event: BeforeUnloadEvent) => { event.preventDefault(); };
-    const navigation = (event: Event) => {
-      if (busy || !window.confirm('Discard unsaved document edits and leave? Cancel to stay and save your Draft.')) { event.preventDefault(); return; }
-      sessions.delete(subjectId);
-      setDraft(saved); setEditing({});
-    };
-    window.addEventListener('beforeunload', unload);
-    window.addEventListener('document-navigation', navigation);
-    return () => { window.removeEventListener('beforeunload', unload); window.removeEventListener('document-navigation', navigation); };
-  }, [dirty, busy, saved, sessions, subjectId]);
+    const discard = () => { setDraft(saved); setEditing({}); };
+    window.addEventListener('document-discard', discard);
+    return () => window.removeEventListener('document-discard', discard);
+  }, [saved]);
   function leave() { return !dirty || window.confirm('Discard unsaved document edits? Cancel to stay and save your Draft.'); }
   function open(doc: Draft) { setDraft(doc); setSaved(doc.revision ? doc : null); setEditing({}); setRemoved(null); setError(''); setStatus(doc.revision ? 'Saved on server · Draft' : 'Unsaved local edits'); setNewer(null); }
   function blocks(value: Block[]) { if (draft) setDraft({ ...draft, blocks: value }); }

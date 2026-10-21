@@ -24,7 +24,7 @@ test('rendered-first editor, order, undo, saved output, navigation guard and fai
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'First', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Insert block before block 1', exact: true }).click();
-    await page.getByLabel('Block 1 Markdown').fill('Second block\n\n    const answer = 42;');
+    await page.getByLabel('Block 1 Markdown').fill('    const answer = 42;\n\nSecond block');
     await page.getByRole('button', { name: 'Save block', exact: true }).click();
     await page.getByRole('article', { name: 'Block 1', exact: true }).hover();
     await page.getByRole('button', { name: 'Move block 1 down', exact: true }).click();
@@ -59,7 +59,7 @@ test('rendered-first editor, order, undo, saved output, navigation guard and fai
     await page.getByLabel('Document title', { exact: true }).fill('Unsaved title');
     await page.getByRole('button', { name: 'Final Markdown', exact: true }).click();
     const dialog = page.getByRole('dialog');
-    const expected = '# My learning\n\nNotes to reuse\n\n## First\n\n**Bold idea**\n\nSecond block\n\n    const answer = 42;\n';
+    const expected = '# My learning\n\nNotes to reuse\n\n## First\n\n**Bold idea**\n\n    const answer = 42;\n\nSecond block\n';
     await expect(dialog.locator('pre')).toHaveText(expected);
     const download = page.waitForEvent('download');
     await dialog.getByRole('button', { name: 'Download .md', exact: true }).click();
