@@ -38,7 +38,7 @@ test('public application and data boundaries enforce Subject ownership and name 
       const response = await request[method](`${url}?id=eq.${own.id}`, { headers, data: { name: 'Stolen', account_id: second.id } });
       expect([401, 403]).toContain(response.status());
     }
-    for (const name of [' ', '\t\n', 'x'.repeat(81)]) {
+    for (const name of [' ', '\t\n', 'x'.repeat(81), '\tBiology\t', '\nBIOLOGY\n', '\u00a0Biology\u00a0', '\ufeffBiology\ufeff']) {
       expect((await request.post(url, { headers, data: { name } })).ok()).toBe(false);
     }
     const independent = await request.post(url, { headers, data: { name: 'Biology' } });
