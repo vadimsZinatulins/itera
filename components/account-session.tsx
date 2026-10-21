@@ -40,6 +40,7 @@ export default function AccountSession() {
   }, [check]);
 
   async function logout() {
+    if (!window.dispatchEvent(new Event('document-navigation', { cancelable: true }))) return;
     setBusy(true); setError('');
     try {
       const response = await fetch('/api/auth/logout', { method: 'POST' });
