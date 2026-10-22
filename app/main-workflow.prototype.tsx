@@ -14,6 +14,7 @@ import PrototypeSwitcher from "@/components/prototype-switcher";
 import ReferenceNotesPrototype from "./reference-notes.prototype";
 import LearningDocumentsPrototype from "./learning-documents.prototype";
 import SubjectsPrototype from "./subjects.prototype";
+import LearningProfilePrototype from "./learning-profile.prototype";
 import { AccountPrototypeGate, AccountPrototypeMenu, AccountPrototypeProvider, bioFraming, useAccountPrototype } from "./account.prototype";
 import s from "./main-workflow.prototype.module.css";
 
@@ -123,7 +124,7 @@ function NoSubjects() {
   return <main className="mx-auto w-full max-w-xl overflow-y-auto px-5 py-10"><h1 className="text-2xl font-semibold tracking-tight">A new subject, a fresh start.</h1><p className="mt-4 text-sm leading-7 text-muted-foreground">Open the subject dropdown beside waypoint. and choose Add subject to start a learning trail. Your shared Reference notes are still available.</p></main>;
 }
 
-function Experience({ variant }: { variant: string }) {
+function Experience({ variant, learningVariant }: { variant: string; learningVariant?: string }) {
   const { subjectId, subjects, documents } = useStudyPrototype();
   const subject = subjects.find(s => s.id === subjectId);
   const [section, setSection] = useState("practice");
@@ -133,16 +134,16 @@ function Experience({ variant }: { variant: string }) {
   const sources = approvedSources(documents, subjectId);
   const candidate = practiceCandidate(sources, selected);
   const props = { start: () => setActiveCandidate(candidate), alternate: () => setSelected((selected + 1) % Math.max(1, sources.length * 2)), selected };
-  const bounded = variant === "B" && section === "practice" && !active;
+  const bounded = !learningVariant && variant === "B" && section === "practice" && !active;
   return <div className={`${s.prototype} ${bounded ? s.boundedStudy : "min-h-dvh pb-28"} bg-background text-foreground`}>
     <header className="border-b"><div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-5 py-5 sm:px-8"><div className="flex min-w-0 items-center gap-1 sm:gap-3"><Button variant="ghost" className="-ml-2 h-10 gap-2 text-xl tracking-tight" onClick={() => { setSection("practice"); setActiveCandidate(null); }}><Leaf className="size-5" />waypoint.</Button><span className="text-muted-foreground/40" aria-hidden="true">/</span><SubjectsPrototype changed={() => { setSelected(0); setActiveCandidate(null); }} /></div><div className="flex shrink-0 items-center gap-3"><span className="hidden text-xs text-muted-foreground sm:block">Design study · sample data</span><AccountPrototypeMenu /></div></div></header>
     <Tabs value={section} onValueChange={value => setSection(String(value))} className={bounded ? "min-h-0 flex-1 gap-0 overflow-hidden" : "gap-0"}>
-      <nav className="mx-auto w-full max-w-6xl shrink-0 border-b px-3 py-3 sm:px-8"><TabsList aria-label="Main navigation" className="h-auto! w-full sm:w-fit"><TabsTrigger value="practice" className="min-h-11 whitespace-normal px-2 text-[11px] sm:px-3 sm:text-sm sm:whitespace-nowrap"><MessageCircle />{variant === "B" ? "Learning trail" : variant === "C" ? "Companion" : "Practice"}</TabsTrigger><TabsTrigger value="documents" className="min-h-11 whitespace-normal px-2 text-[11px] sm:px-3 sm:text-sm sm:whitespace-nowrap"><BookOpen />Learning Documents</TabsTrigger><TabsTrigger value="notes" className="min-h-11 whitespace-normal px-2 text-[11px] sm:px-3 sm:text-sm sm:whitespace-nowrap"><FileText />Reference notes</TabsTrigger></TabsList></nav>
+      <nav className="mx-auto w-full max-w-6xl shrink-0 border-b px-3 py-3 sm:px-8"><TabsList aria-label="Main navigation" className="h-auto! w-full flex-wrap sm:w-fit"><TabsTrigger value="practice" className="min-h-11 whitespace-normal px-2 text-[11px] sm:px-3 sm:text-sm sm:whitespace-nowrap"><MessageCircle />{variant === "B" ? "Learning trail" : variant === "C" ? "Companion" : "Practice"}</TabsTrigger><TabsTrigger value="documents" className="min-h-11 whitespace-normal px-2 text-[11px] sm:px-3 sm:text-sm sm:whitespace-nowrap"><BookOpen />Learning Documents</TabsTrigger><TabsTrigger value="notes" className="min-h-11 whitespace-normal px-2 text-[11px] sm:px-3 sm:text-sm sm:whitespace-nowrap"><FileText />Reference notes</TabsTrigger></TabsList></nav>
       <TabsContent value="notes" keepMounted className={section === "notes" ? "" : "hidden"}><ReferenceNotesPrototype /></TabsContent>
       <TabsContent value="documents" keepMounted className={section === "documents" ? "" : "hidden"}>{subjects.map(s => <div key={s.id} hidden={subjectId !== s.id}><LearningDocumentsPrototype subjectId={s.id} /></div>)}{!subjects.length && <NoSubjects />}</TabsContent>
-      <TabsContent value="practice" keepMounted className={section === "practice" ? "flex min-h-0 flex-col" : "hidden"}>{!subjects.length ? <NoSubjects /> : activeCandidate ? <Practice key={`${subjectId}-${activeCandidate.source.id}-${selected}`} candidate={activeCandidate} exit={() => setActiveCandidate(null)} /> : variant === "B" ? <VariantB key={subjectId} {...props} /> : variant === "C" ? <VariantC key={subjectId} {...props} /> : <VariantA key={subjectId} {...props} />}</TabsContent>
+      <TabsContent value="practice" keepMounted className={section === "practice" ? "flex min-h-0 flex-col" : "hidden"}>{!subjects.length ? <NoSubjects /> : learningVariant ? subjects.map(item => <div key={item.id} hidden={subjectId !== item.id}><LearningProfilePrototype variant={learningVariant} subjectId={item.id} /></div>) : activeCandidate ? <Practice key={`${subjectId}-${activeCandidate.source.id}-${selected}`} candidate={activeCandidate} exit={() => setActiveCandidate(null)} /> : variant === "B" ? <VariantB key={subjectId} {...props} /> : variant === "C" ? <VariantC key={subjectId} {...props} /> : <VariantA key={subjectId} {...props} />}</TabsContent>
     </Tabs>
-    {!bounded && <details className="mx-auto mt-8 max-w-6xl px-5 text-xs text-muted-foreground sm:px-8"><summary className="cursor-pointer py-3">Design study · current state</summary><pre className="mt-2 overflow-auto rounded-lg border p-4 text-[10px] whitespace-pre-wrap">{JSON.stringify({ variant, section, screen: active ? "practice / recap" : "start", subject: subject?.name ?? null, subjects, approvedSourceIds: sources.map(d => d.id), challenge: candidate?.title ?? null, source: candidate?.source ?? null, persistence: "none; switching variants resets the demo" }, null, 2)}</pre></details>}<PrototypeSwitcher />
+    {!bounded && !learningVariant && <details className="mx-auto mt-8 max-w-6xl px-5 text-xs text-muted-foreground sm:px-8"><summary className="cursor-pointer py-3">Design study · current state</summary><pre className="mt-2 overflow-auto rounded-lg border p-4 text-[10px] whitespace-pre-wrap">{JSON.stringify({ variant, section, screen: active ? "practice / recap" : "start", subject: subject?.name ?? null, subjects, approvedSourceIds: sources.map(d => d.id), challenge: candidate?.title ?? null, source: candidate?.source ?? null, persistence: "none; switching variants resets the demo" }, null, 2)}</pre></details>}<PrototypeSwitcher names={learningVariant ? ["Topic landscape", "Connected concepts", "Evidence trail"] : undefined} />
   </div>;
 }
 
@@ -150,5 +151,8 @@ export default function MainWorkflowPrototype() {
   const params = useSearchParams();
   const value = params.get("variant");
   const variant = value === "A" || value === "C" ? value : "B";
-  return <AccountPrototypeProvider><AccountPrototypeGate><StudyPrototypeProvider key={variant}><Experience variant={variant} /></StudyPrototypeProvider></AccountPrototypeGate></AccountPrototypeProvider>;
+  const learningStudy = params.get("study") !== "workflow";
+  const experience = <StudyPrototypeProvider><Experience variant={learningStudy ? "B" : variant} learningVariant={learningStudy ? variant : undefined} /></StudyPrototypeProvider>;
+  // The design detour opens directly; real auth and the original simulated login are not under study.
+  return <AccountPrototypeProvider>{learningStudy ? experience : <AccountPrototypeGate>{experience}</AccountPrototypeGate>}</AccountPrototypeProvider>;
 }

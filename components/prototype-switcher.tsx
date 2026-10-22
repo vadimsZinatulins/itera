@@ -4,9 +4,9 @@ import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const variants = ["A", "B", "C"];
-const names = ["Challenge first", "Trail + chat", "Conversation first"];
+const defaultNames = ["Challenge first", "Trail + chat", "Conversation first"];
 
-export default function PrototypeSwitcher() {
+export default function PrototypeSwitcher({ names = defaultNames }: { names?: string[] }) {
   const router = useRouter();
   const params = useSearchParams();
   const key = params.get("variant") ?? "B";
