@@ -98,15 +98,18 @@ function DocumentWorkspace({ subjectId, sessions }: { subjectId: string; session
     if (save && draft) blocks(draft.blocks.map(b => b.id === id ? { ...b, markdown: editing[id] } : b));
     setEditing(current => { const next = { ...current }; delete next[id]; return next; });
   }
+  function acceptSavedDocument(document: Draft) {
+    setDraft(document); setSaved(document); setNewer(null);
+    setDocuments(current => [document, ...current.filter(doc => doc.id !== document.id)]);
+  }
   async function save() {
     if (!draft) return;
     setBusy(true); setError(''); setStatus('Saving…');
     try {
-      const response = await fetch('/api/documents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...draft, subjectId }) });
+      const response = await fetch('/api/documents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: draft.id, subjectId, revision: draft.revision, title: draft.title, description: draft.description, blocks: draft.blocks }) });
       const result = await response.json();
       if (!response.ok) { setError(result.error); setStatus('Save failed · unsaved local edits retained'); return; }
-      setDraft(result); setSaved(result); setNewer(null);
-      setDocuments(current => [result, ...current.filter(doc => doc.id !== result.id)]);
+      acceptSavedDocument(result);
       setStatus(`Saved on server · ${documentStatus(result)} · ${result.practice_version ? 'Practice version unchanged' : 'not approved for practice'}`);
     } catch { setError('Save failed. Check your connection; your edits remain here.'); setStatus('Save failed · unsaved local edits retained'); }
     finally { setBusy(false); }
@@ -118,8 +121,7 @@ function DocumentWorkspace({ subjectId, sessions }: { subjectId: string; session
       const response = await fetch('/api/documents/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: saved.id, subjectId, revision: saved.revision }) });
       const result = await response.json();
       if (!response.ok) { setError(result.error); setStatus('Approval not confirmed · refresh and review'); return; }
-      setDraft(result); setSaved(result); setNewer(null);
-      setDocuments(current => [result, ...current.filter(doc => doc.id !== result.id)]);
+      acceptSavedDocument(result);
       setStatus('Saved on server · Available for practice · not demonstrated understanding');
     } catch { setError('Approval could not be confirmed. Refresh and review before retrying.'); setStatus('Approval not confirmed'); }
     finally { setBusy(false); setOutput(null); }

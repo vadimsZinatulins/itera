@@ -4,7 +4,7 @@ Ticket: `docs/production-plan:.scratch/production-release/issues/03-author-learn
 
 - `components/learning-documents.tsx`: rendered-first ordered Markdown blocks. Save block commits to the local working Draft; Save as Draft persists the complete aggregate. Save/Cancel and Ctrl/Command+Enter are composition-aware. Hover/focus actions on desktop, visible actions on touch. Immediate latest-removal undo.
 - `GET /api/documents?subject=<uuid>`: authenticated, account/Subject-scoped saved Drafts. Search runs over that Subject's saved Draft and approved snapshot titles, descriptions and block content. Status filters distinguish Drafts, Draft revisions and documents available for practice (including those with excluded Draft revisions).
-- `POST /api/documents`: same-origin authenticated Draft save. Accepts `id`, `subjectId`, expected `revision` (0 creates), `title`, `description`, ordered `blocks: [{id, markdown}]`. Ownership comes from the live authenticated session, never the payload.
+- `POST /api/documents`: same-origin authenticated Draft save. The editor sends only Draft mutation fields, never the approved snapshot (so snapshot size cannot double the save payload). Accepts `id`, `subjectId`, expected `revision` (0 creates), `title`, `description`, ordered `blocks: [{id, markdown}]`. Ownership comes from the live authenticated session, never the payload.
 - `save_learning_document` is the sole public data write boundary. SQL compare-and-swap atomically replaces the aggregate and increments revision. Direct table writes are revoked. RLS scopes reads to live account sessions. Apply migration `202603010003_learning_documents.sql` after the account and Subject migrations.
 - Conflict returns 409 without changing the saved record. Attempted text remains in the editor. Refresh/review displays the latest saved version alongside it; replacing attempted edits requires confirmation. No automatic merge or force-overwrite.
 - Draft limits at the database boundary: 300 title characters, 5000 description characters, 200 blocks and 500 KB serialized block content. API also limits request size.
@@ -29,7 +29,7 @@ Run all tooling in Docker:
 bash scripts/local.sh check
 bash scripts/local.sh test tests/documents.spec.ts
 bash scripts/local.sh test tests/document-editor.spec.ts tests/document-privacy.spec.ts
-bash scripts/local.sh test tests/practice-versions.spec.ts tests/practice-approval-guards.spec.ts tests/practice-privacy.spec.ts
+bash scripts/local.sh test tests/practice-versions.spec.ts tests/practice-approval-guards.spec.ts tests/practice-privacy.spec.ts tests/practice-large-document.spec.ts
 bash scripts/local.sh test
 ```
 

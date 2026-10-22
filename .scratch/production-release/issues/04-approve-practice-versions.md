@@ -21,4 +21,6 @@
 
 Apply `supabase/migrations/202603010004_practice_versions.sql` after existing migrations without resetting data. Save a Draft; review and confirm Ready to Practice. Change/save the Draft and inspect the unchanged approved version; review and confirm Update practice version. Check reload and another session. Conversations/AI/practice activities remain later slices.
 
-Docker checks and production-build public-boundary tests are documented in `docs/learning-documents.md`. The desktop multi-session tests explicitly hover blocks before using hover-only actions; this removes the observed automation timeout without changing production interaction behavior.
+**Verification:** Docker typecheck/lint and production build passed; full public-boundary suite: 23/23 passed. Document and Practice-version multi-session workflows also passed three repeated runs (9/9 tests). Commands are documented in `docs/learning-documents.md`. The desktop multi-session tests explicitly hover blocks before using hover-only actions; this removes the observed automation timeout without changing production interaction behavior.
+
+Independent review found a large-document regression: the editor resent the approved snapshot with Draft mutations, doubling request size. A 310 KB browser regression reproduced HTTP 413 before the fix and passed after limiting the payload to Draft fields. Shared successful-save/approval state synchronization was also deduplicated.
