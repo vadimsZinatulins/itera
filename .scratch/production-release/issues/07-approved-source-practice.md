@@ -4,9 +4,9 @@
 
 **Blocked by:** 04 — Explicitly approve and update Practice versions; 06 — Start and resume durable AI conversations.
 
-**Status:** implemented — awaiting owner manual acceptance
+**Status:** closed — implemented and manually accepted
 
-**Implementation:** `feat/07-approved-source-practice`. Opt-in practice shares durable conversations, uses trusted approved-snapshot selection and persists per-reply source identity/version provenance. See [`docs/conversations.md`](../../../docs/conversations.md#approved-source-practice) for selection policy, limits and migration instructions. Docker typecheck, lint, production build and the full public-boundary suite passed (33/33 tests). Controlled outgoing provider streams verified scoped multi-document snapshots, adversarial-content boundaries, foreign source-ID denial, Draft exclusion, historical/current revision provenance, reload/hint continuation and empty/oversized source failures. Existing tests cover key/model/provider failures and anonymous/direct-data denial; the service-only context RPC has explicit anonymous/foreign denial coverage. No deployment or live charged provider request performed.
+**Implementation:** `feat/07-approved-source-practice`. Opt-in practice shares durable conversations, uses trusted approved-snapshot selection and persists per-reply source identity/version provenance. See [`docs/conversations.md`](../../../docs/conversations.md#approved-source-practice) for selection policy, limits and migration instructions. Docker typecheck, lint, production build and the full public-boundary suite passed (33/33 tests). Controlled outgoing provider streams verified scoped multi-document snapshots, adversarial-content boundaries, foreign source-ID denial, Draft exclusion, historical/current revision provenance, reload/hint continuation and empty/oversized source failures. Existing tests cover key/model/provider failures and anonymous/direct-data denial; the service-only context RPC has explicit anonymous/foreign denial coverage. Automated verification used controlled provider output without live charged requests. The owner subsequently confirmed manual checks passed and accepted the implementation. No deployment performed.
 
 ## Manual acceptance
 
@@ -25,3 +25,7 @@
 - [x] Missing key/model, provider limits and overlarge context produce honest errors/limitations, not silent model fallback or false claims to have processed omitted content.
 - [x] Public-boundary tests capture controlled outgoing provider requests to verify approved-only, multi-document, account/Subject-scoped selection; approved snapshots remain unchanged by Draft saves.
 - [x] Exercise foreign source IDs, adversarial source text, empty sources, save/reload and source-version provenance with real test persistence. Extend leakage tests when later account-content features land.
+
+## Comments
+
+- Owner: “Manual checks passed. Please close the issue.” Manual acceptance complete; issue closed. Hosted deployment remains a separate release gate.
