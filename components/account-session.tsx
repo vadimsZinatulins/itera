@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 
 function clearAccountState() {
-  // Reserved namespace for future device-only drafts. Never delete server-saved work.
+  // Stop pending writes before clearing device-only drafts. Server history is untouched.
+  window.dispatchEvent(new Event('account-state-cleared'));
   for (const name of ['localStorage', 'sessionStorage'] as const) {
     try {
       const storage = window[name];

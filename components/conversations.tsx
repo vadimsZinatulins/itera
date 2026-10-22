@@ -5,14 +5,15 @@ import { History, MessageCircle, Plus, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { documentId as operationId } from '@/lib/document-id';
+import { readChatRecovery, saveChatRecovery, type ChatOperation } from '@/lib/chat-recovery';
 import styles from './conversations.module.css';
 
 type Thread = { id: string; title: string };
 type Source = { id: string; title: string; revision: number };
 type Turn = { practice?: boolean; sources?: Source[]; id: string; ordinal: number; user_text: string; assistant_text: string; status: 'complete' | 'incomplete'; pending_until: string };
-type Operation = { subject: string; conversation: string; operation: string; text: string; practice: boolean };
+type Operation = ChatOperation;
 
-export default function Conversations({ subjectId, initialConversation }: { subjectId: string; initialConversation?: string }) {
+export default function Conversations({ accountId, subjectId, initialConversation }: { accountId: string; subjectId: string; initialConversation?: string }) {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selected, setSelected] = useState(initialConversation ?? '');
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -25,6 +26,40 @@ export default function Conversations({ subjectId, initialConversation }: { subj
   const [retry, setRetry] = useState<Operation | null>(null);
   const transcript = useRef<HTMLDivElement>(null);
   const abort = useRef<AbortController | null>(null);
+  const active = useRef(true);
+  const [localSaved, setLocalSaved] = useState(false);
+
+  function retain(text: string, mode: boolean, operation: Operation | null, scope = selected) {
+    if (active.current) setLocalSaved(saveChatRecovery(accountId, subjectId, scope, { text, practice: mode, operation }));
+  }
+  function restore(scope: string) {
+    const recovered = readChatRecovery(accountId, subjectId, scope);
+    setDraft(recovered?.text ?? ''); setRetry(recovered?.operation ?? null);
+    setPractice(recovered?.practice ?? false); setLocalSaved(Boolean(recovered));
+    if (recovered?.operation) setNotice('Send unconfirmed. Check the same send explicitly; it may already be saved. No automatic retry was made.');
+  }
+  useEffect(() => {
+    active.current = true;
+    // Read browser storage after hydration, never during the server render.
+    const hydration = window.setTimeout(() => restore(initialConversation ?? ''), 0);
+    const clear = () => { active.current = false; window.clearTimeout(hydration); abort.current?.abort(); setBusy(true); setDraft(''); setRetry(null); setTurns([]); setThreads([]); setPractice(false); setNotice(''); };
+    window.addEventListener('account-state-cleared', clear);
+    return () => { active.current = false; window.clearTimeout(hydration); window.removeEventListener('account-state-cleared', clear); };
+    // The parent keys this component by account and Subject; thread changes restore in choose().
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountId, subjectId]);
+
+  useEffect(() => {
+    const deleted = (event: Event) => {
+      const scope = (event as CustomEvent<{ account: string; subject?: string; conversation?: string }>).detail;
+      if (scope.account !== accountId || (scope.subject && scope.subject !== subjectId)) return;
+      if (scope.conversation && scope.conversation !== selected && scope.conversation !== retry?.conversation) return;
+      abort.current?.abort(); setBusy(false); setLoading(false); setDraft(''); setRetry(null); setTurns([]); setSelected(''); setLocalSaved(false);
+      setNotice('Deleted scope cleared from this device.'); url('');
+    };
+    window.addEventListener('chat-recovery-deleted', deleted);
+    return () => window.removeEventListener('chat-recovery-deleted', deleted);
+  }, [accountId, subjectId, selected, retry]);
 
   function url(id: string) {
     const next = new URL(window.location.href);
@@ -34,14 +69,15 @@ export default function Conversations({ subjectId, initialConversation }: { subj
   async function trail(signal?: AbortSignal) {
     const response = await fetch(`/api/conversations?subject=${subjectId}`, { cache: 'no-store', signal });
     if (!response.ok) throw new Error('Could not load your trail. Try reloading.');
-    setThreads(await response.json());
+    const data = await response.json();
+    if (active.current && !signal?.aborted) setThreads(data);
   }
   useEffect(() => {
     const controller = new AbortController();
     void fetch(`/api/conversations?subject=${subjectId}`, { cache: 'no-store', signal: controller.signal }).then(async response => {
       if (!response.ok) throw new Error('Trail unavailable');
       const data = await response.json();
-      if (!controller.signal.aborted) setThreads(data);
+      if (active.current && !controller.signal.aborted) setThreads(data);
     }).catch(() => { if (!controller.signal.aborted) setNotice('Could not load your trail. Try reloading.'); });
     return () => { controller.abort(); abort.current?.abort(); };
   }, [subjectId]);
@@ -51,51 +87,66 @@ export default function Conversations({ subjectId, initialConversation }: { subj
     void (async () => {
       try {
         const response = await fetch(`/api/conversations?subject=${subjectId}&conversation=${selected}`, { cache: 'no-store', signal: controller.signal });
-        if (!response.ok) throw new Error('Conversation unavailable. Choose another thread or reload.');
+        if (!response.ok) {
+          if (response.status === 404 && !controller.signal.aborted) {
+            saveChatRecovery(accountId, subjectId, selected, null); setDraft(''); setRetry(null); setLocalSaved(false);
+          }
+          throw new Error('Conversation unavailable. Choose another thread or reload.');
+        }
         const data = await response.json();
-        if (!controller.signal.aborted) { setTurns(data); setPractice(data.at(-1)?.practice ?? false); }
+        if (active.current && !controller.signal.aborted) {
+          setTurns(data);
+          setPractice(readChatRecovery(accountId, subjectId, selected)?.practice ?? data.at(-1)?.practice ?? false);
+        }
       } catch { if (!controller.signal.aborted) setNotice('Conversation unavailable. Choose another thread or reload.'); }
       finally { if (!controller.signal.aborted) setLoading(false); }
     })();
     return () => controller.abort();
-  }, [selected, subjectId]);
+  }, [selected, subjectId, accountId]);
   useEffect(() => { transcript.current?.scrollTo({ top: transcript.current.scrollHeight }); }, [turns]);
 
   function choose(id: string) {
     if (busy) return;
     if (id && id === selected) { setMobile('chat'); return; }
-    setLoading(Boolean(id)); setSelected(id); setTurns([]); setDraft(''); setRetry(null); setNotice(''); setMobile('chat'); url(id);
+    setLoading(Boolean(id)); setSelected(id); setTurns([]); setNotice(''); restore(id); setMobile('chat'); url(id);
   }
   async function send() {
     if (busy || loading || (!retry && !draft.trim())) return;
     const operation = retry ?? { subject: subjectId, conversation: selected || operationId(), operation: operationId(), text: draft, practice };
+    if (retry && !window.confirm('Check this same send? If it was saved, no generation is replayed. If it was not saved, this explicitly starts a request that may incur charges. Provider billing deduplication is not guaranteed.')) return;
+    retain(operation.text, operation.practice, operation);
     setRetry(operation); setBusy(true); setNotice('Sending — not yet confirmed saved.');
     const controller = new AbortController(); abort.current = controller;
     let saved = false;
     try {
       const response = await fetch('/api/conversations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(operation), signal: controller.signal });
+      if (!active.current || controller.signal.aborted) return;
       if (!response.ok) {
         // A definitive rejection did not save this send. Keep text editable;
         // ambiguous transport/server failures retain the exact operation instead.
-        if (response.status >= 400 && response.status < 500) setRetry(null);
+        if (response.status >= 400 && response.status < 500) { setRetry(null); retain(operation.text, operation.practice, null); }
         const result = await response.json(); throw new Error(result.error ?? 'Send failed.');
       }
       if (response.headers.get('content-type')?.includes('application/json')) {
-        setSelected(operation.conversation); url(operation.conversation); setDraft(''); setRetry(null);
-        const history = await fetch(`/api/conversations?subject=${subjectId}&conversation=${operation.conversation}`, { cache: 'no-store' });
+        saved = true;
+        retain('', operation.practice, null); setSelected(operation.conversation); url(operation.conversation); setDraft(''); setRetry(null);
+        const history = await fetch(`/api/conversations?subject=${subjectId}&conversation=${operation.conversation}`, { cache: 'no-store', signal: controller.signal });
         if (!history.ok) throw new Error('Saved message found, but history could not be loaded. Reload to check.');
-        setTurns(await history.json()); await trail();
-        setNotice('Message already saved. No generation was retried.'); return;
+        const data = await history.json();
+        if (!active.current || controller.signal.aborted) return;
+        setTurns(data); await trail(controller.signal);
+        if (active.current && !controller.signal.aborted) setNotice('Message already saved. No generation was retried.'); return;
       }
       const reader = response.body!.getReader(); const decoder = new TextDecoder(); let buffer = '', ended = false;
       while (true) {
         const { done, value } = await reader.read(); if (done) break;
+        if (!active.current || controller.signal.aborted) return;
         buffer += decoder.decode(value, { stream: true });
         let end;
         while ((end = buffer.indexOf('\n')) !== -1) {
           const event = JSON.parse(buffer.slice(0, end)); buffer = buffer.slice(end + 1);
           if (event.saved) {
-            saved = true; setDraft(''); setRetry(null); url(operation.conversation);
+            saved = true; retain('', operation.practice, null); setDraft(''); setRetry(null); url(operation.conversation);
             setTurns(current => [...current.filter(turn => turn.id !== operation.operation), { id: operation.operation, ordinal: current.length + 1, user_text: operation.text, assistant_text: '', status: 'incomplete', pending_until: '' }]);
             setThreads(current => current.some(thread => thread.id === operation.conversation) ? current : [{ id: operation.conversation, title: operation.text.slice(0, 80) }, ...current]);
             setNotice('Message saved. Reply streaming — not complete yet.');
@@ -111,10 +162,12 @@ export default function Conversations({ subjectId, initialConversation }: { subj
       }
       if (!ended) setNotice('Reply interrupted — incomplete. Reload to inspect saved output. No automatic generation retry was made.');
     } catch (error) {
-      if (!controller.signal.aborted) setNotice(error instanceof Error ? error.message : 'Send failed. Retry the same send to check persistence.');
+      if (!controller.signal.aborted) setNotice(saved ? 'Message saved. Reply interrupted — incomplete. Reload to inspect saved output. No automatic generation retry was made.' : `Send failed or unconfirmed. ${error instanceof Error ? error.message : 'Check the same send to avoid duplication.'}`);
     } finally {
-      setBusy(false);
-      if (saved) setSelected(operation.conversation);
+      if (active.current) {
+        setBusy(false);
+        if (saved && !controller.signal.aborted) setSelected(operation.conversation);
+      }
     }
   }
   return <section className="mt-8" aria-label="Learning Trail">
@@ -141,13 +194,18 @@ export default function Conversations({ subjectId, initialConversation }: { subj
           </div>)}
         </div>
         <form className="shrink-0 border-t p-3" onSubmit={event => { event.preventDefault(); void send(); }}>
-          <label className="mb-3 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={practice} disabled={busy || loading || Boolean(retry)} onChange={event => setPractice(event.target.checked)} />Use approved sources for practice, explanations and hints</label>
+          <label className="mb-3 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={practice} disabled={busy || loading || Boolean(retry)} onChange={event => { setPractice(event.target.checked); retain(draft, event.target.checked, null); }} />Use approved sources for practice, explanations and hints</label>
           <label htmlFor="conversation-message" className="sr-only">Your message</label>
-          <Textarea id="conversation-message" className="min-h-20 max-h-36 text-base" value={draft} disabled={busy || Boolean(retry)} onChange={event => setDraft(event.target.value)} placeholder="Bring a question…" />
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{retry ? 'Unconfirmed send retained in this session' : 'Unsent text is not server-saved'}</span><Button type="submit" className="min-h-11" disabled={busy || loading || (!retry && !draft.trim())}><Send />{busy ? 'Sending…' : retry ? 'Retry same send' : 'Send message'}</Button></div>
+          <Textarea id="conversation-message" className="min-h-20 max-h-36 text-base" value={draft} disabled={busy || Boolean(retry)} onChange={event => { setDraft(event.target.value); retain(event.target.value, practice, null); }} placeholder="Bring a question…" />
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{draft || retry ? `${retry ? 'Unconfirmed send' : 'Unsent'} · ${localSaved ? 'Saved on this device' : 'Device recovery unavailable'} · ${retry ? 'server save unconfirmed' : 'not server-saved'} · device recovery does not synchronise` : 'Unsent text is not server-saved'}</span><Button type="submit" className="min-h-11" disabled={busy || loading || (!retry && !draft.trim())}><Send />{busy ? 'Sending…' : retry ? 'Retry same send' : 'Send message'}</Button></div>
         </form>
       </section>
     </div>
+    {turns.at(-1)?.status === 'incomplete' && !retry && <Button variant="outline" disabled={busy || loading || Boolean(draft.trim())} onClick={() => {
+      if (!window.confirm('Request another reply? The previous request may already have incurred charges. This sends a new message and may incur another charge; provider billing deduplication is not guaranteed.')) return;
+      const text = 'Please try answering my previous message again. The previous reply was incomplete.';
+      setDraft(text); retain(text, practice, null); setNotice('New request prepared. Choose Send message to generate another reply.');
+    }}>Request another reply</Button>}
     <p aria-live="polite" aria-label="Conversation status" className="mt-3 text-sm">{notice}</p>
     <p className="mt-3 text-xs leading-6 text-muted-foreground">This conversation and, only with Use approved sources enabled, current approved Practice versions in this Subject are sent to OpenAI. Drafts and Reference notes are excluded. Sources are bounded to 20 documents / 16,000 bytes; oversized context is refused, not silently truncated. Requests use your selected key/model. History is stored in this app with optional provider response storage disabled. This does not eliminate provider retention: abuse-monitoring logs may retain content for up to 30 days, with policy exceptions. API usage may incur charges. Replies are limited to 2,048 output tokens; messages to 8,000 UTF-8 bytes and conversation context to 28,000 bytes. No automatic generation retries.</p>
   </section>;
