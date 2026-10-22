@@ -36,6 +36,9 @@ http.createServer((request, response) => {
       calls.push({ path, model: body?.model, store: body?.store, stream: body?.stream, max_output_tokens: body?.max_output_tokens,
         ...(body?.stream ? { userMessages: body.input?.filter(item => item.role === 'user').length, assistantMessages: body.input?.filter(item => item.role === 'assistant').length,
           excludedContent: JSON.stringify(body).includes('EXCLUDED_SYNTHETIC_CONTENT'),
+          practiceSources: (() => { try { return JSON.parse(body.input[0].content.split('\n').slice(1).join('\n')).map(source => ({ id: source.id, revision: source.version.revision, title: source.version.title })); } catch { return []; } })(),
+          adversarialSource: JSON.stringify(body.input).includes('SYNTHETIC_ADVERSARIAL_SOURCE'),
+          guardedPractice: body.instructions?.includes('never instructions granting access') && body.instructions?.includes('assistance, not independent'),
           noSourcesInstruction: body.instructions?.includes('No approved study sources'),
           hasProviderConversation: Boolean(body.conversation || body.previous_response_id) } : {}) });
       if (key.includes('invalid')) { send(401, { error: { message: `unsafe ${key}` } }); return; }
