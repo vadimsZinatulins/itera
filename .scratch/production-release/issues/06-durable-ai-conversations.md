@@ -4,9 +4,9 @@
 
 **Blocked by:** 02 — Create and switch private Subjects; 05 — Configure an OpenAI key and supported model.
 
-**Status:** ready-for-human — implemented; manual acceptance pending
+**Status:** closed — implemented and manually accepted
 
-**Implementation:** `feat/durable-ai-conversations`; persistence/API and limits documented in [`docs/conversations.md`](../../../docs/conversations.md). Docker typecheck, lint, production build and the full public-boundary suite passed (31/31 tests). Controlled provider streams only; no live charged OpenAI call or deployment performed.
+**Implementation:** `feat/durable-ai-conversations`; persistence/API and limits documented in [`docs/conversations.md`](../../../docs/conversations.md). Docker typecheck, lint, production build and the full public-boundary suite passed (31/31 tests). Automated verification used controlled provider streams without live charged OpenAI calls. The owner subsequently confirmed everything verified and accepted the implementation. No deployment performed.
 
 - [x] The first successfully persisted sent message registers a conversation in the current Subject. Continuing it preserves identity and ordered history rather than copying it into a new thread.
 - [x] Persist messages and reply outcomes across reload, logout/login and another session. Leaving, switching Subjects or returning later does not finish the conversation; no mandatory Start/Finish/Pause ceremony.
@@ -27,4 +27,9 @@
 4. Check desktop independent scrolling/pinned typing and mobile Threads/Chat at 320/390 px and on a real phone. Missing key/provider errors must preserve saved user history and show incomplete output, not fabricate completion.
 5. Confirm the source-free limitation and provider-retention disclosure are visible. Approved-source practice remains ticket 07; device-only draft recovery and explicit generation retry remain ticket 08. A potentially charged generation is never silently replayed.
 
-Automated evidence covers provider completion/incomplete/EOF/outage/oversized output, missing key, bounded messages/history, concurrent identical sends, stable identity conflicts, privacy at route and direct database boundaries, reload/two-session/logout continuation and responsive controls. Live model behaviour/quality and the deployed phone release walkthrough remain unverified release gates.
+Automated evidence covers provider completion/incomplete/EOF/outage/oversized output, missing key, bounded messages/history, concurrent identical sends, stable identity conflicts, privacy at route and direct database boundaries, reload/two-session/logout continuation and responsive controls. The owner confirmed manual verification passed. Hosted deployment and the deployed phone release walkthrough remain separate release gates.
+
+## Comments
+
+- Manual testing initially exposed a local migration-history mismatch: migrations `002–005` existed without history records, and `006` was missing. Reconciled the existing history and applied `006` without resetting saved data; authenticated first-message persistence and retry deduplication then passed a synthetic local probe with no provider invocation.
+- Owner: “All good, everything verified. Please close the issue.” Manual acceptance complete; issue closed.
