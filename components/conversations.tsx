@@ -9,6 +9,7 @@ import { readChatRecovery, saveChatRecovery, type ChatOperation } from '@/lib/ch
 import styles from './conversations.module.css';
 import PracticeRecaps from './practice-recaps';
 import type { Assessment } from '@/lib/assessment';
+import AssessmentBudgetStatus from './assessment-budget';
 
 type Thread = { id: string; title: string };
 type Source = { id: string; title: string; revision: number };
@@ -207,17 +208,18 @@ export default function Conversations({ accountId, subjectId, initialConversatio
             <p>{assessment.opened} questions opened · {assessment.answered} answered · {assessment.skipped} skipped (not assessed)</p>
             <p>Activity progress, not a mastery score. Easy/medium/hard are AI-estimated task labels, not calibrated ability.</p>
             {assessment.current_question && <p>Current question {assessment.current_question.number} · {assessment.current_question.difficulty} · {assessment.current_question.assistance.length ? `Requested assistance: ${assessment.current_question.assistance.join(', ')}` : 'No requested assistance recorded'}</p>}
+            <AssessmentBudgetStatus key={selected} budget={assessment.budget} disabled={busy || loading || Boolean(retry) || Boolean(draft.trim())} prepare={prepareAssessment} />
             <p>Unfinished activity resumes in this conversation. Conversation and recap review can continue independently.</p>
           </section>}
           {selected && <PracticeRecaps key={`${accountId}:${subjectId}:${selected}`} subject={subjectId} conversation={selected} activity={`${turns.length}:${turns.at(-1)?.status}`} checkpoint={Boolean(turns.at(-1)?.assistant_text.includes('[recap-checkpoint]'))} disabled={busy || loading} />}
         </div>
         <form className="shrink-0 border-t p-3" onSubmit={event => { event.preventDefault(); void send(); }}>
           <div className="mb-2 flex flex-wrap gap-2">
-            <Button type="button" variant="outline" disabled={busy || loading || Boolean(retry) || Boolean(draft.trim())} onClick={() => prepareAssessment(assessment ? 'Resume my assessment in this conversation. Keep the current question if it is unanswered.' : 'Start a quick assessment from my approved sources. Ask one question at a time.')}>{assessment ? 'Resume assessment' : 'Quick assessment'}</Button>
+            <Button type="button" className="min-h-11" variant="outline" disabled={busy || loading || Boolean(retry) || Boolean(draft.trim())} onClick={() => prepareAssessment(assessment ? 'Resume my assessment in this conversation. Keep the current question if it is unanswered.' : 'Start a quick assessment from my approved sources. Ask one question at a time.')}>{assessment ? 'Resume assessment' : 'Quick assessment'}</Button>
             {assessment?.current_question && <>
-              <Button type="button" variant="ghost" disabled={busy || loading || Boolean(retry) || Boolean(draft.trim())} onClick={() => prepareAssessment('Please give a hint for the current assessment question.')}>Hint</Button>
-              <Button type="button" variant="ghost" disabled={busy || loading || Boolean(retry) || Boolean(draft.trim())} onClick={() => prepareAssessment('Please explain the current assessment question before I answer.')}>Explain question</Button>
-              <Button type="button" variant="ghost" disabled={busy || loading || Boolean(retry) || Boolean(draft.trim())} onClick={() => prepareAssessment('Skip the current assessment question; it is not assessed. Continue with another question if appropriate.')}>Skip question</Button>
+              <Button type="button" className="min-h-11" variant="ghost" disabled={busy || loading || Boolean(retry) || Boolean(draft.trim())} onClick={() => prepareAssessment('Please give a hint for the current assessment question.')}>Hint</Button>
+              <Button type="button" className="min-h-11" variant="ghost" disabled={busy || loading || Boolean(retry) || Boolean(draft.trim())} onClick={() => prepareAssessment('Please explain the current assessment question before I answer.')}>Explain question</Button>
+              <Button type="button" className="min-h-11" variant="ghost" disabled={busy || loading || Boolean(retry) || Boolean(draft.trim())} onClick={() => prepareAssessment('Skip the current assessment question; it is not assessed. Continue with another question if appropriate.')}>Skip question</Button>
             </>}
           </div>
           <label className="mb-3 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={practice} disabled={busy || loading || Boolean(retry)} onChange={event => { setPractice(event.target.checked); retain(draft, event.target.checked, null); }} />Use approved sources for practice, explanations and hints</label>

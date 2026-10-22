@@ -20,4 +20,4 @@
 
 ## Verification
 
-Docker typecheck/lint and production build passed. Focused adaptive-assessment/conversation suite passed (5 tests); recap regression also exercised during implementation. Controlled provider responses only; no live charged requests or deployment. Apply migration 009 with the Docker migration runner. Final combined full-suite evidence is recorded with issue 11.
+Docker typecheck/lint and production build passed. Final combined public-boundary suite passed (43 tests), including adaptive questions, qualified recap provenance across reviewed checkpoints, resumption/recovery, stale/replayed sends, model action/difficulty violations, source isolation and direct-data denial. Controlled provider responses only; no live charged requests or deployment. Apply migrations 009–010 with the Docker migration runner. Soft-budget verification is recorded with issue 11. Manual acceptance pending; left on the requested feature branch.

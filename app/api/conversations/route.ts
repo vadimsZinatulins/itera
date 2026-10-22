@@ -125,9 +125,9 @@ export async function POST(request: Request) {
             }
             if (event.complete && raw.trim()) providerComplete = true;
           }
-          if (assessing && providerComplete) {
-            const output = readAssessmentOutput(raw, state, input.text);
-            const result = await writer.rpc('server_assessment_reply', { p_owner: account.id, p_subject: input.subject, p_conversation: input.conversation, p_operation: input.operation, p_text: output.reply, p_topic: output.topic, p_requested_difficulty: output.requested_difficulty, p_action: output.action, p_question: output.question, p_difficulty: output.difficulty });
+          if (plan && providerComplete) {
+            const output = readAssessmentOutput(raw, state, input.text, plan);
+            const result = await writer.rpc('server_assessment_reply', { p_owner: account.id, p_subject: input.subject, p_conversation: input.conversation, p_operation: input.operation, p_text: output.reply, p_topic: output.topic, p_requested_difficulty: output.requested_difficulty, p_action: output.action, p_question: output.question, p_difficulty: output.difficulty, p_budget: output.budget });
             if (result.error || !result.data) throw new SettingsError('Assessment changed or progress could not be saved. Reload to inspect it. No automatic retry was made.');
             assessmentSaved = true; text = output.reply; complete = true;
             send({ delta: text, assessment: result.data });
