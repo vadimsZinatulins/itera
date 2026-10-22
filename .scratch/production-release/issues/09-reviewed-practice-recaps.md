@@ -4,9 +4,9 @@
 
 **Blocked by:** 07 — Practise using approved Subject material.
 
-**Status:** ready-for-human
+**Status:** closed — implemented and manually accepted
 
-**Implementation:** `feat/09-reviewed-practice-recaps` (created from `main`). Implemented; awaiting manual acceptance. See [reviewed recap workflow and migration notes](../../../docs/conversations.md#reviewed-practice-recaps).
+**Implementation:** `feat/09-reviewed-practice-recaps` (created from `main`). Implemented and manually accepted by the owner. See [reviewed recap workflow and migration notes](../../../docs/conversations.md#reviewed-practice-recaps).
 
 - [x] Offer a recap on explicit request and at meaningful activity checkpoints, not an arbitrary fixed learner-message count. Ignoring a proposal never blocks continued chat.
 - [x] Present editable/correctable proposals inline with accept and dismiss actions. Unreviewed or dismissed proposals do not become reviewed understanding or replace earlier accepted observations.
@@ -22,7 +22,7 @@
 
 - Docker `bash scripts/local.sh check`: typecheck + lint passed.
 - Docker `bash scripts/local.sh test`: production build + all 39 public-boundary tests passed.
-- Controlled OpenAI proposals/streams only; no live charged calls or deployment.
-- Manual acceptance pending: apply migration 008 with `bash scripts/migrate.sh`, practise from approved material, request/edit/review a recap, continue chatting, reload and inspect Reviewed observations. Inspect real-model uncertainty, difficulty and assistance qualification. Checkpoint offers depend on semantic model judgement, not a fixed activity count.
+- Automated verification used controlled OpenAI proposals/streams; no live charged calls or deployment performed by the agent.
+- The owner confirmed manual testing passed and accepted the implementation. Checkpoint offers depend on semantic model judgement, not a fixed activity count.
 - Later reset/removal must bump the Subject-understanding revision and preserve coverage checkpoints (ticket 13). Observation provenance already supports independent transcript/document deletion; deletion controls remain tickets 14–16.
-- Left on the requested feature branch; not merged into `main`.
+- Integrated into `main` after automated checks and owner acceptance; implementation branch deleted.
