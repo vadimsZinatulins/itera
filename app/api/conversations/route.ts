@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     const ownedConversation = await client.from('conversations').select('id').eq('id', conversation).eq('subject_id', subject).eq('account_id', account.id).maybeSingle();
     if (ownedConversation.error) return reply({ error: 'Could not load conversation.' }, 503);
     if (!ownedConversation.data) return reply({ error: 'Conversation unavailable.' }, 404);
-    const { data, error } = await client.from('conversation_turns').select('id,ordinal,user_text,assistant_text,status,pending_until').eq('account_id', account.id).eq('conversation_id', conversation).order('ordinal');
+    const { data, error } = await client.from('conversation_turns').select('id,ordinal,user_text,assistant_text,status,pending_until,practice,sources').eq('account_id', account.id).eq('conversation_id', conversation).order('ordinal');
     return error ? reply({ error: 'Could not load conversation.' }, 503) : reply(data);
   } catch { return reply({ error: 'Could not load conversations. Try again.' }, 503); }
 }
@@ -52,11 +52,12 @@ export async function POST(request: Request) {
     try { parsed = JSON.parse(new TextDecoder().decode(bytes)); } catch { return reply({ error: 'Invalid message.' }, 400); }
     if (!parsed || typeof parsed !== 'object') return reply({ error: 'Invalid message.' }, 400);
     const values = parsed as Record<string, unknown>;
-    if (Object.keys(values).some(key => !['subject', 'conversation', 'operation', 'text'].includes(key)) || !uuid(values.subject) || !uuid(values.conversation) || !uuid(values.operation) || typeof values.text !== 'string' || !values.text.trim()) return reply({ error: 'Invalid message.' }, 400);
-    const input = { subject: values.subject, conversation: values.conversation, operation: values.operation, text: values.text };
+    if (Object.keys(values).some(key => !['subject', 'conversation', 'operation', 'text', 'practice'].includes(key)) || !uuid(values.subject) || !uuid(values.conversation) || !uuid(values.operation) || typeof values.text !== 'string' || !values.text.trim()) return reply({ error: 'Invalid message.' }, 400);
+    if ('practice' in values && typeof values.practice !== 'boolean') return reply({ error: 'Invalid practice selection.' }, 400);
+    const input = { subject: values.subject, conversation: values.conversation, operation: values.operation, text: values.text, practice: values.practice === true };
     if (new TextEncoder().encode(input.text).length > 8000) return reply({ error: 'Message too large (8,000 UTF-8 bytes maximum).' }, 413);
     const client = await authClient();
-    const saved = await client.rpc('send_conversation_message', { p_subject: input.subject, p_conversation: input.conversation, p_operation: input.operation, p_text: input.text });
+    const saved = await client.rpc('send_conversation_message', { p_subject: input.subject, p_conversation: input.conversation, p_operation: input.operation, p_text: input.text, p_practice: input.practice });
     if (saved.error) {
       const code = saved.error.code;
       return reply({ error: code === '40001' ? 'A reply is already in progress. Return shortly.' : code === '22023' ? 'Message or conversation context limit reached, or operation identity changed. Use a new thread for more context.' : code === '42501' ? 'Subject or conversation unavailable.' : 'Message could not be saved. Retry the same send to avoid duplication.' }, code === '40001' ? 409 : code === '22023' ? 400 : code === '42501' ? 403 : 503);
@@ -87,7 +88,17 @@ export async function POST(request: Request) {
             context.push({ role: 'user', content: turn.user_text });
             if (turn.assistant_text) context.push({ role: 'assistant', content: turn.status === 'complete' ? turn.assistant_text : '[Incomplete previous reply]\n' + turn.assistant_text });
           }
-          for await (const event of streamConversation(context, abort.signal)) {
+          let material: unknown[] = [];
+          if (input.practice) {
+            const selected = await writer.rpc('server_practice_context', { p_owner: account.id, p_subject: input.subject, p_operation: input.operation });
+            if (selected.error) throw new SettingsError(selected.error.code === '22023' ? 'Approved source context exceeds 20 documents or 16,000 bytes. Narrow your Subject material before practising; no sources were sent.' : 'Approved sources could not be loaded. No generation was started.');
+            material = selected.data;
+            const provenance = await client.from('conversation_turns').select('sources').eq('id', input.operation).single();
+            if (provenance.error) throw new SettingsError('Source provenance could not be confirmed. No generation was started.');
+            send({ sources: provenance.data.sources });
+            if (!material.length) throw new SettingsError('No approved sources in this Subject. Create a Learning Document and choose Ready to Practice. Goals and organisation chat remains available with practice switched off.', 422);
+          }
+          for await (const event of streamConversation(context, abort.signal, material)) {
             if (event.delta) {
               if (new TextEncoder().encode(text + event.delta).length > 16000) throw new Error('Output limit');
               text += event.delta;

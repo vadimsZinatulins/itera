@@ -134,6 +134,7 @@ test('public application and data boundaries deny anonymous/foreign access and f
         expect(await read.text()).not.toContain('Private owner');
         expect((await request.post(`${apiURL()}/rest/v1/${table}`, { headers, data: { id: randomUUID(), account_id: owner.id } })).ok()).toBe(false);
       }
+      expect((await request.post(`${apiURL()}/rest/v1/rpc/server_practice_context`, { headers, data: { p_owner: owner.id, p_subject: subject.id, p_operation: sent.operation } })).ok()).toBe(false);
       expect((await request.post(`${apiURL()}/rest/v1/rpc/server_conversation_reply`, { headers, data: { p_owner: owner.id, p_subject: subject.id, p_conversation: sent.conversation, p_operation: sent.operation, p_text: 'Forged completion', p_complete: true, p_final: true } })).ok()).toBe(false);
       expect((await request.post(`${apiURL()}/rest/v1/rpc/send_conversation_message`, { headers, data: { p_subject: subject.id, p_conversation: sent.conversation, p_operation: randomUUID(), p_text: 'Foreign injection' } })).ok()).toBe(false);
     }

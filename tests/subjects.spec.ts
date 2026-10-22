@@ -16,7 +16,7 @@ test('create private Subjects, validate names and switch durable study contexts'
     await page.getByRole('button', { name: 'Create subject', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Photography', exact: true })).toBeVisible();
     const photographyURL = page.url();
-    await expect(page.getByText('Ready to Practice', { exact: false })).toBeVisible();
+    await expect(page.getByText(/^Capture study material in Learning Documents below/)).toContainText('Ready to Practice');
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Photography', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Switch subject' }).click();
