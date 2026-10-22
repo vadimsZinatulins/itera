@@ -91,7 +91,9 @@ case "$COMMAND" in
       -e TEST_UPSTREAM_URL="http://supabase_kong_$PROJECT:8000" \
       itera-owner-test node tests/auth-upstream.mjs >/dev/null
     docker run -d --name "$APP" --network "$PROJECT" --network-alias app.test \
-      --env-file "$WORKDIR/app.env" itera-owner-production >/dev/null
+      --env-file "$WORKDIR/app.env" \
+      -v "$ROOT/tests/openai-transport.cjs:/test/openai-transport.cjs:ro" \
+      -e NODE_OPTIONS=--require=/test/openai-transport.cjs itera-owner-production >/dev/null
     docker run --rm --network "$PROJECT" --env-file "$WORKDIR/test.env" \
       itera-owner-test npm test -- "$@"
     ;;

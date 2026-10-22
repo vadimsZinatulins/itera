@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { Leaf, BookOpen } from 'lucide-react';
 import { authClient, currentAccount } from '@/lib/auth/server';
 import SubjectPicker from '@/components/subject-picker';
@@ -33,7 +34,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
   return <>
     <header className="border-b"><div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-8">
       <p className="flex items-center gap-2 font-medium"><Leaf aria-hidden="true" className="size-5" />Learning Companion</p>
-      <div className="flex items-center gap-2"><SubjectPicker subjects={subjects} activeId={active?.id} /><AccountSession /></div>
+      <div className="flex items-center gap-2"><SubjectPicker subjects={subjects} activeId={active?.id} /><Link href="/settings" className="text-sm underline">AI settings</Link><AccountSession /></div>
     </div></header>
     <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-8 sm:px-8 sm:py-12">
       <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Your learning trail</p>
