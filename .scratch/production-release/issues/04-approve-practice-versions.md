@@ -4,9 +4,9 @@
 
 **Blocked by:** 03 — Author and save Learning Documents.
 
-**Status:** ready-for-human
+**Status:** closed — implemented and manually accepted
 
-**Implementation:** `feat/04-approve-practice-versions`; implemented, pending owner manual acceptance. Original scope from `docs/production-plan`.
+**Implementation:** `feat/04-approve-practice-versions`, commits `ecc8195`, `6db4ea6` and `72a396c`; implemented and manually accepted by the owner. Original scope from `docs/production-plan`.
 
 - [x] Ready to Practice creates the first coherent saved snapshot, including title, description and ordered block content. Require a nonblank title and substantive saved content.
 - [x] Outstanding edits must be saved or discarded before approval. A failed save or stale approval cannot publish mixed or unconfirmed content.
@@ -24,3 +24,7 @@ Apply `supabase/migrations/202603010004_practice_versions.sql` after existing mi
 **Verification:** Docker typecheck/lint and production build passed; full public-boundary suite after review fixes: 24/24 passed. Document and Practice-version multi-session workflows also passed three repeated runs (9/9 tests). Commands are documented in `docs/learning-documents.md`. The desktop multi-session tests explicitly hover blocks before using hover-only actions; this removes the observed automation timeout without changing production interaction behavior.
 
 Independent review found a large-document regression: the editor resent the approved snapshot with Draft mutations, doubling request size. A 310 KB browser regression reproduced HTTP 413 before the fix and passed after limiting the payload to Draft fields. Shared successful-save/approval state synchronization was also deduplicated. Focused independent follow-up confirmed both findings resolved, with no new issues in the fix scope (Standards: 0 remaining; Spec: 0 remaining).
+
+## Comments
+
+Owner completed the manual checklist, confirmed “All checked, everything works,” and requested issue closure. No further implementation or acceptance work remains for ticket 04.
