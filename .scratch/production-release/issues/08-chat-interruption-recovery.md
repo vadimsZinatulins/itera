@@ -4,7 +4,7 @@
 
 **Blocked by:** 06 — Start and resume durable AI conversations.
 
-**Status:** implemented
+**Status:** closed — implemented and manually accepted
 
 - [x] Recover unsent chat text on the current device, partitioned by account, Subject and conversation, including a not-yet-created thread. Switching threads does not mix drafts.
 - [x] Label local recovery Saved on this device and distinguish it from server-saved history. Do not claim local drafts synchronise to another device or provide offline AI.
@@ -27,3 +27,7 @@
 ## Validation
 
 Docker-only `scripts/local.sh check` (typecheck + lint), production build via the test harness, and `scripts/local.sh test tests/chat-recovery.spec.ts tests/conversations.spec.ts tests/approved-practice.spec.ts`: **10 passed**. Covers reload, thread/Subject switching, logout, uncertain sends before/after acknowledgement, provider interruption, navigation during a slow reply, separate-session persisted partial output, explicit charge-warning recovery, stable message identity and no automatic generation replay.
+
+## Comments
+
+- User confirmed manual testing passed and accepted the implementation. Issue closed on `feat/chat-interruption-recovery`; intentionally not merged into `main`, per user instruction.
