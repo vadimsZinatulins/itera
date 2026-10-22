@@ -4,9 +4,9 @@
 
 **Blocked by:** 01 — Owner sign-in to the production application.
 
-**Status:** implemented
+**Status:** closed — implemented and manually accepted
 
-Implementation: `feat/05-openai-settings`; operational/API notes in [`docs/openai-settings.md`](../../../docs/openai-settings.md). Docker production build, typecheck, lint and full public-boundary suite passed (27 tests). No live charged OpenAI request or hosted deployment performed; real selected-model/phone verification remains a release gate. Runtime now requires the isolated server credential broker's `SUPABASE_SERVICE_ROLE_KEY` and migration `202603010005_openai_settings.sql`.
+Implementation: `feat/05-openai-settings`; operational/API notes in [`docs/openai-settings.md`](../../../docs/openai-settings.md). Docker production build, typecheck, lint and full public-boundary suite passed (27 tests). Automated runs made no live charged OpenAI requests. The owner confirmed all manual tests passed and accepted the implementation. Hosted deployment and the deployed phone walkthrough remain separate release gates. Runtime now requires the isolated server credential broker's `SUPABASE_SERVICE_ROLE_KEY` and migration `202603010005_openai_settings.sql`.
 
 - [x] Save, replace and remove the authenticated account's key through write-only settings. Do not return the full stored key after entry or put it in browser storage, general content responses, logs, prompts, exports or error bodies.
 - [x] Credential access is server-only after account authorisation and isolated from ordinary account-content access. Verify anonymous, foreign-account and direct public data access cannot retrieve it.
