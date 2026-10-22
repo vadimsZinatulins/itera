@@ -1,6 +1,6 @@
 # Learning Companion
 
-A private companion for practising and retaining learning. Production work starts with externally provisioned learner accounts and email-code sign-in. Public signup is disabled. Subject, Learning Document and practice features follow in later issues.
+A private companion for practising and retaining learning. Externally provisioned learner accounts sign in with email codes; public signup is disabled. Private Subjects contain durable Learning Document Drafts and explicitly approved Practice versions. Conversations and practice activities follow in later issues.
 
 ## Development and tests
 

@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const subject = await client.from('subjects').select('id').eq('id', subjectId).eq('account_id', account.id).maybeSingle();
     if (subject.error) return reply({ error: 'Could not load documents.' }, 503);
     if (!subject.data) return reply({ error: 'Subject unavailable.' }, 404);
-    const { data, error } = await client.from('learning_documents').select('id,subject_id,revision,title,description,blocks').eq('account_id', account.id).eq('subject_id', subjectId).order('updated_at', { ascending: false });
+    const { data, error } = await client.from('learning_documents').select('id,subject_id,revision,title,description,blocks,practice_version').eq('account_id', account.id).eq('subject_id', subjectId).order('updated_at', { ascending: false });
     return error ? reply({ error: 'Could not load documents.' }, 503) : reply(data);
   } catch { return reply({ error: 'Could not load documents. Try again.' }, 503); }
 }

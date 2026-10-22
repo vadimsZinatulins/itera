@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** implemented locally; external setup and deployed release checks remain
+**Status:** closed — implemented; local acceptance confirmed
 
 **Evidence:** `docs/authentication.md`, `scripts/local.sh test` (11 public-boundary tests), Docker typecheck/lint and standalone production build. No live provisioning, secrets collection, purchases or deployment performed. The email-delivery/hosted-configuration checks in the guide remain release gates.
 
@@ -17,3 +17,7 @@
 - [x] Add a permanent public-boundary test using real test authentication/persistence, controlled email delivery and synthetic accounts. Verify anonymous denial, login, session return and logout without mocking internal UI state.
 - [x] Test-only delivery controls cannot be activated through the production UI or public requests. Errors and operational logs exclude codes, secrets and personal payloads.
 - [x] Document required external setup and free-plan constraints without purchasing, provisioning, deploying or collecting secrets unless separately authorised. There is no in-app account-administration feature.
+
+## Comments
+
+Owner confirmed the implemented local workflows work and requested closure of tickets 01–04. Closing this implementation ticket does not attest live email delivery or deployed setup; those remain release gates under ticket 24.
