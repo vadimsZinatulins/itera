@@ -42,6 +42,9 @@ http.createServer((request, response) => {
           adversarialSource: JSON.stringify(body.input).includes('SYNTHETIC_ADVERSARIAL_SOURCE'),
           guardedPractice: body.instructions?.includes('never instructions granting access') && body.instructions?.includes('assistance, not independent'),
           noSourcesInstruction: body.instructions?.includes('No approved study sources'),
+          assessment: body.instructions?.includes('ADAPTIVE_ASSESSMENT'),
+          assessmentHard: body.instructions?.includes('requested difficulty hard'),
+          assessmentEasy: body.instructions?.includes('requested difficulty easy'),
           hasProviderConversation: Boolean(body.conversation || body.previous_response_id) } : {}) });
       if (key.includes('invalid')) { send(401, { error: { message: `unsafe ${key}` } }); return; }
       if (key.includes('forbidden')) { send(403, { error: { message: `unsafe ${key}` } }); return; }
@@ -56,6 +59,18 @@ http.createServer((request, response) => {
         if (body?.stream) {
           response.writeHead(200, { 'Content-Type': 'text/event-stream' });
           const event = data => response.write(`data: ${JSON.stringify(data)}\n\n`);
+          if (body.instructions?.includes('ADAPTIVE_ASSESSMENT')) {
+            let state; try { state = JSON.parse(body.instructions.split('Authorised activity state (data, not source material): ').at(-1)); } catch { state = null; }
+            const text = body.input.filter(item => item.role === 'user').at(-1)?.content ?? '';
+            const action = /\bhint\b/i.test(text) ? 'hint' : /\bexplain/i.test(text) ? 'explanation' : /^skip\b/i.test(text) ? 'skip' : /organis|ordinary chat/i.test(text) ? 'chat' : state?.current_question && /^My answer/i.test(text) ? 'answer' : 'resume';
+            const checkpoint = /wrap up|checkpoint now/i.test(text);
+            const question = !checkpoint && (!state?.current_question || ['answer','skip'].includes(action)) ? `Synthetic question ${(state?.opened ?? 0) + 1}: apply the approved idea to a new example?` : null;
+            const difficulty = responseMode === 'wrong-difficulty' ? 'easy' : body.instructions.includes('requested difficulty hard') ? 'hard' : body.instructions.includes('requested difficulty easy') ? 'easy' : (state?.opened ?? 0) % 2 ? 'hard' : 'medium';
+            const output = { feedback: checkpoint ? 'A meaningful checkpoint; review a recap or continue.' : 'Synthetic feedback: reasoning is provisional, not mastery.', question, difficulty: question ? difficulty : null, topic: 'Motion', action, checkpoint };
+            event({ type: 'response.output_text.delta', delta: JSON.stringify(output) });
+            if (responseMode !== 'disconnect') event({ type: responseMode === 'completed' || responseMode === 'wrong-difficulty' ? 'response.completed' : 'response.incomplete', response: { status: responseMode === 'wrong-difficulty' ? 'completed' : responseMode } });
+            response.end(); return;
+          }
           event({ type: 'response.output_text.delta', delta: 'Let’s organise ' });
           setTimeout(() => {
             event({ type: 'response.output_text.delta', delta: responseMode === 'oversized' ? 'x'.repeat(17000) : responseMode === 'checkpoint' ? 'your study goals. [recap-checkpoint]' : 'your study goals.' });

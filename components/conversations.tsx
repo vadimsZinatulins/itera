@@ -8,10 +8,11 @@ import { documentId as operationId } from '@/lib/document-id';
 import { readChatRecovery, saveChatRecovery, type ChatOperation } from '@/lib/chat-recovery';
 import styles from './conversations.module.css';
 import PracticeRecaps from './practice-recaps';
+import type { Assessment } from '@/lib/assessment';
 
 type Thread = { id: string; title: string };
 type Source = { id: string; title: string; revision: number };
-type Turn = { practice?: boolean; sources?: Source[]; id: string; ordinal: number; user_text: string; assistant_text: string; status: 'complete' | 'incomplete'; pending_until: string };
+type Turn = { assessment?: Assessment | null; practice?: boolean; sources?: Source[]; id: string; ordinal: number; user_text: string; assistant_text: string; status: 'complete' | 'incomplete'; pending_until: string };
 type Operation = ChatOperation;
 
 export default function Conversations({ accountId, subjectId, initialConversation }: { accountId: string; subjectId: string; initialConversation?: string }) {
@@ -30,6 +31,13 @@ export default function Conversations({ accountId, subjectId, initialConversatio
   const active = useRef(true);
   const [localSaved, setLocalSaved] = useState(false);
 
+  const assessment = turns.filter(turn => turn.assessment).at(-1)?.assessment ?? null;
+
+  function prepareAssessment(text: string) {
+    if (busy || loading || retry || draft.trim()) return;
+    setPractice(true); setDraft(text); retain(text, true, null);
+    setNotice('Assessment request prepared. Edit topic, difficulty or available time, then Send message.');
+  }
   function retain(text: string, mode: boolean, operation: Operation | null, scope = selected) {
     if (active.current) setLocalSaved(saveChatRecovery(accountId, subjectId, scope, { text, practice: mode, operation }));
   }
@@ -113,7 +121,7 @@ export default function Conversations({ accountId, subjectId, initialConversatio
   }
   async function send() {
     if (busy || loading || (!retry && !draft.trim())) return;
-    const operation = retry ?? { subject: subjectId, conversation: selected || operationId(), operation: operationId(), text: draft, practice };
+    const operation = retry ?? { subject: subjectId, conversation: selected || operationId(), operation: operationId(), text: draft, practice, ...(assessment ? { assessmentRevision: assessment.revision } : {}) };
     if (retry && !window.confirm('Check this same send? If it was saved, no generation is replayed. If it was not saved, this explicitly starts a request that may incur charges. Provider billing deduplication is not guaranteed.')) return;
     retain(operation.text, operation.practice, operation);
     setRetry(operation); setBusy(true); setNotice('Sending — not yet confirmed saved.');
@@ -152,6 +160,7 @@ export default function Conversations({ accountId, subjectId, initialConversatio
             setThreads(current => current.some(thread => thread.id === operation.conversation) ? current : [{ id: operation.conversation, title: operation.text.slice(0, 80) }, ...current]);
             setNotice('Message saved. Reply streaming — not complete yet.');
           }
+          if (event.assessment) setTurns(current => current.map(turn => turn.id === operation.operation ? { ...turn, assessment: event.assessment } : turn));
           if (event.sources) setTurns(current => current.map(turn => turn.id === operation.operation ? { ...turn, sources: event.sources } : turn));
           if (event.delta) setTurns(current => current.map(turn => turn.id === operation.operation ? { ...turn, assistant_text: turn.assistant_text + event.delta } : turn));
           if (event.status) {
@@ -193,9 +202,24 @@ export default function Conversations({ accountId, subjectId, initialConversatio
             <article className="ml-4 rounded-xl bg-muted p-4"><h3 className="mb-1 text-xs font-medium">You · saved</h3><p className="whitespace-pre-wrap break-words text-sm leading-7">{turn.user_text}</p></article>
             <article className="p-2">{Boolean(turn.sources?.length) && <details className="mb-3 text-sm"><summary className="min-h-11 cursor-pointer">Approved sources selected · {turn.sources!.length}</summary><ul className="break-words">{turn.sources!.map(source => <li key={source.id}>{source.title} · Practice version {source.revision} <span className="break-all text-xs text-muted-foreground">({source.id})</span></li>)}</ul><p className="text-xs text-muted-foreground">Versions selected for this reply, not proof every source was used or an incomplete request reached OpenAI. Later updates do not change this record.</p></details>}<h3 className="mb-1 text-xs font-medium">Companion · {turn.status === 'complete' ? 'complete' : 'incomplete'}</h3><p className="whitespace-pre-wrap break-words text-sm leading-7">{turn.assistant_text.replaceAll('[recap-checkpoint]', '') || 'No completed reply saved.'}</p></article>
           </div>)}
+          {assessment && <section aria-label="Assessment progress" className="space-y-2 rounded-xl border p-3 text-sm">
+            <h3 className="font-medium">Assessment · {assessment.topic}</h3>
+            <p>{assessment.opened} questions opened · {assessment.answered} answered · {assessment.skipped} skipped (not assessed)</p>
+            <p>Activity progress, not a mastery score. Easy/medium/hard are AI-estimated task labels, not calibrated ability.</p>
+            {assessment.current_question && <p>Current question {assessment.current_question.number} · {assessment.current_question.difficulty} · {assessment.current_question.assistance.length ? `Requested assistance: ${assessment.current_question.assistance.join(', ')}` : 'No requested assistance recorded'}</p>}
+            <p>Unfinished activity resumes in this conversation. Conversation and recap review can continue independently.</p>
+          </section>}
           {selected && <PracticeRecaps key={`${accountId}:${subjectId}:${selected}`} subject={subjectId} conversation={selected} activity={`${turns.length}:${turns.at(-1)?.status}`} checkpoint={Boolean(turns.at(-1)?.assistant_text.includes('[recap-checkpoint]'))} disabled={busy || loading} />}
         </div>
         <form className="shrink-0 border-t p-3" onSubmit={event => { event.preventDefault(); void send(); }}>
+          <div className="mb-2 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" disabled={busy || loading || Boolean(retry) || Boolean(draft.trim())} onClick={() => prepareAssessment(assessment ? 'Resume my assessment in this conversation. Keep the current question if it is unanswered.' : 'Start a quick assessment from my approved sources. Ask one question at a time.')}>{assessment ? 'Resume assessment' : 'Quick assessment'}</Button>
+            {assessment?.current_question && <>
+              <Button type="button" variant="ghost" disabled={busy || loading || Boolean(retry) || Boolean(draft.trim())} onClick={() => prepareAssessment('Please give a hint for the current assessment question.')}>Hint</Button>
+              <Button type="button" variant="ghost" disabled={busy || loading || Boolean(retry) || Boolean(draft.trim())} onClick={() => prepareAssessment('Please explain the current assessment question before I answer.')}>Explain question</Button>
+              <Button type="button" variant="ghost" disabled={busy || loading || Boolean(retry) || Boolean(draft.trim())} onClick={() => prepareAssessment('Skip the current assessment question; it is not assessed. Continue with another question if appropriate.')}>Skip question</Button>
+            </>}
+          </div>
           <label className="mb-3 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={practice} disabled={busy || loading || Boolean(retry)} onChange={event => { setPractice(event.target.checked); retain(draft, event.target.checked, null); }} />Use approved sources for practice, explanations and hints</label>
           <label htmlFor="conversation-message" className="sr-only">Your message</label>
           <Textarea id="conversation-message" className="min-h-20 max-h-36 text-base" value={draft} disabled={busy || Boolean(retry)} onChange={event => { setDraft(event.target.value); retain(event.target.value, practice, null); }} placeholder="Bring a question…" />
