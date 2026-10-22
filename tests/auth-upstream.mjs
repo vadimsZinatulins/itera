@@ -35,6 +35,8 @@ http.createServer((request, response) => {
       // Synthetic-only operational observation: never record keys or arbitrary text.
       calls.push({ path, model: body?.model, store: body?.store, stream: body?.stream, max_output_tokens: body?.max_output_tokens,
         ...(body?.stream ? { userMessages: body.input?.filter(item => item.role === 'user').length, assistantMessages: body.input?.filter(item => item.role === 'assistant').length,
+          reviewedContext: JSON.stringify(body.input).includes('REVIEWED_SYNTHETIC_OBSERVATION'),
+          unreviewedContext: JSON.stringify(body.input).includes('TENTATIVE_SYNTHETIC_OBSERVATION'),
           excludedContent: JSON.stringify(body).includes('EXCLUDED_SYNTHETIC_CONTENT'),
           practiceSources: (() => { try { return JSON.parse(body.input[0].content.split('\n').slice(1).join('\n')).map(source => ({ id: source.id, revision: source.version.revision, title: source.version.title })); } catch { return []; } })(),
           adversarialSource: JSON.stringify(body.input).includes('SYNTHETIC_ADVERSARIAL_SOURCE'),
@@ -56,13 +58,14 @@ http.createServer((request, response) => {
           const event = data => response.write(`data: ${JSON.stringify(data)}\n\n`);
           event({ type: 'response.output_text.delta', delta: 'Let’s organise ' });
           setTimeout(() => {
-            event({ type: 'response.output_text.delta', delta: responseMode === 'oversized' ? 'x'.repeat(17000) : 'your study goals.' });
-            if (responseMode !== 'disconnect') event({ type: responseMode === 'completed' ? 'response.completed' : 'response.incomplete', response: { status: responseMode } });
+            event({ type: 'response.output_text.delta', delta: responseMode === 'oversized' ? 'x'.repeat(17000) : responseMode === 'checkpoint' ? 'your study goals. [recap-checkpoint]' : 'your study goals.' });
+            if (responseMode !== 'disconnect') event({ type: ['completed','checkpoint'].includes(responseMode) ? 'response.completed' : 'response.incomplete', response: { status: responseMode === 'checkpoint' ? 'completed' : responseMode } });
             response.end();
           }, responseMode === 'slow' ? 3000 : 75);
           return;
         }
-        send(200, { status: responseMode, output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }] }); return;
+        const recap = typeof body?.input === 'string' && body.input.startsWith('PRACTICE_RECAP:');
+        send(200, { status: responseMode, output: [{ type: 'message', content: [{ type: 'output_text', text: recap ? JSON.stringify({ text: 'TENTATIVE_SYNTHETIC_OBSERVATION: reasoning remains provisional.', difficulty: 'Hard requested; not a calibrated ability measure.', assistance: 'Hint requested; not independent performance.', uncertainty: 'One answer is insufficient to infer mastery.' }) : 'OK' }] }] }); return;
       }
       send(404, {});
     });
