@@ -33,7 +33,11 @@ http.createServer((request, response) => {
       let body;
       try { body = raw ? JSON.parse(raw) : null; } catch { send(400, {}); return; }
       // Synthetic-only operational observation: never record keys or arbitrary text.
-      calls.push({ path, model: body?.model, store: body?.store, stream: body?.stream, max_output_tokens: body?.max_output_tokens });
+      calls.push({ path, model: body?.model, store: body?.store, stream: body?.stream, max_output_tokens: body?.max_output_tokens,
+        ...(body?.stream ? { userMessages: body.input?.filter(item => item.role === 'user').length, assistantMessages: body.input?.filter(item => item.role === 'assistant').length,
+          excludedContent: JSON.stringify(body).includes('EXCLUDED_SYNTHETIC_CONTENT'),
+          noSourcesInstruction: body.instructions?.includes('No approved study sources'),
+          hasProviderConversation: Boolean(body.conversation || body.previous_response_id) } : {}) });
       if (key.includes('invalid')) { send(401, { error: { message: `unsafe ${key}` } }); return; }
       if (key.includes('forbidden')) { send(403, { error: { message: `unsafe ${key}` } }); return; }
       if (key.includes('quota')) { send(429, { error: { message: `unsafe ${key}` } }); return; }
@@ -44,6 +48,17 @@ http.createServer((request, response) => {
       if (path === '/openai/responses') {
         if (responseMode === 'unavailable') { send(404, { error: { message: `unsafe ${key}` } }); return; }
         if (responseMode === 'outage') { send(503, { error: { message: `unsafe ${key}` } }); return; }
+        if (body?.stream) {
+          response.writeHead(200, { 'Content-Type': 'text/event-stream' });
+          const event = data => response.write(`data: ${JSON.stringify(data)}\n\n`);
+          event({ type: 'response.output_text.delta', delta: 'Let’s organise ' });
+          setTimeout(() => {
+            event({ type: 'response.output_text.delta', delta: responseMode === 'oversized' ? 'x'.repeat(17000) : 'your study goals.' });
+            if (responseMode !== 'disconnect') event({ type: responseMode === 'completed' ? 'response.completed' : 'response.incomplete', response: { status: responseMode } });
+            response.end();
+          }, 75);
+          return;
+        }
         send(200, { status: responseMode, output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }] }); return;
       }
       send(404, {});
