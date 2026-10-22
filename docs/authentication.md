@@ -23,6 +23,7 @@ Prerequisites: Docker Engine/Desktop, a POSIX host shell, and a local checkout w
 
 ```sh
 scripts/local.sh start
+scripts/migrate.sh  # apply pending local migrations; no reset
 scripts/local.sh dev
 # Open http://localhost:3100
 # Studio (local account administration): http://localhost:55423
@@ -71,6 +72,24 @@ Do not purchase, provision, deploy or collect secrets without separate authoriza
 6. Set the Supabase Site URL to the final HTTPS application origin; keep redirect allowlists exact and minimal. Set server runtime `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and `APP_ORIGIN` as in `.env.example`. The service-role key is a privileged server-only secret restricted in code to the credential broker; see [OpenAI settings](openai-settings.md). Ensure previews use a deliberate separate configuration/origin, not the production session or arbitrary reflected Host headers.
 7. Use Vercel's supported **Node 24.x** runtime, also declared in `package.json` and used in Docker. The production Docker target runs as the non-root Node user and excludes test files and dev dependencies. Local build success is not deployment evidence.
 8. Before release, receive a real code on a phone, exercise invalid/resend/return/logout paths, confirm no demo route or code/secret/personal-payload application logging, verify direct account isolation and revoked access in the hosted project, and check real inbox/spam delivery. Local Mailpit does not prove Resend delivery or hosted settings.
+
+### Local migration runner
+
+`bash scripts/migrate.sh` builds the existing Docker `supabase-tools` target and applies pending migrations with `migration up --local --network-id itera-owner-local`, then lists history. It requires the local database to be running (`bash scripts/local.sh start`). It accepts no hosted project, database URL, arbitrary CLI flags or automatic migration-history repair.
+
+If existing objects are missing their migration-history records, the default mode reports the error and stops; it does not treat table existence as proof of a fully applied migration. Review schema/history before marking records applied if preserving data. Migration failures never automatically trigger a reset.
+
+To deliberately discard the local development database and replay every migration:
+
+```sh
+# Stop the foreground local application with Ctrl-C first.
+bash scripts/migrate.sh --force
+# At the prompt type: RESET itera-owner-local
+```
+
+This uses `db reset --local --no-seed --yes` inside Docker, with the local project network explicitly selected. It deletes local accounts, Subjects, documents, conversations and saved API keys. There is no app-provided undo. Recreate the learner through local Studio and re-enter AI settings afterward; no account/key is automatically provisioned. Hosted databases are not targeted. The script refuses a force reset while the standard local app container is running, and uses `.local/migrate-lock` to prevent concurrent invocations. After a hard kill, verify no migration process remains before removing a stale lock.
+
+Safety/orchestration checks: `bash tests/shell/migrate.sh` uses a fake Docker command in a temporary workspace, including confirmation/cancellation, local-only targeting, unavailable services, locks and migration failures. These checks do not reset the owner's database. The isolated Docker public-boundary harness separately exercises real Supabase resets and all SQL migrations.
 
 ### Free-plan constraints
 

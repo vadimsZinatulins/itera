@@ -4,7 +4,7 @@ Ticket 06 adds ordinary goals/organisation chat and explicitly requested authori
 
 ## Persistence and authorisation
 
-Apply `supabase/migrations/202603010006_conversations.sql` after the existing migrations. `GET /api/conversations?subject=<uuid>` lists the current account's trail; adding `conversation=<uuid>` reads its ordered turns. `POST /api/conversations` accepts only `{ subject, conversation, operation, text }` with stable UUID identities. The server never trusts a supplied account, history, assistant message, model or source selection.
+With local Supabase running, run `bash scripts/migrate.sh` to apply pending migrations, including `supabase/migrations/202603010006_conversations.sql`, without resetting data. For a deliberate fresh local database, stop the app and use `bash scripts/migrate.sh --force` (deletes accounts/content/keys after typed confirmation). See [migration runner details](authentication.md#local-migration-runner). `GET /api/conversations?subject=<uuid>` lists the current account's trail; adding `conversation=<uuid>` reads its ordered turns. `POST /api/conversations` accepts only `{ subject, conversation, operation, text }` with stable UUID identities. The server never trusts a supplied account, history, assistant message, model or source selection.
 
 The authenticated `send_conversation_message` RPC checks the live session and Subject ownership, serialises each conversation, and atomically inserts the conversation on its first message plus its user turn and incomplete reply record. Tables are read-only to account JWTs, with active-session RLS. The service-only reply RPC updates an existing owned turn; it cannot create missing conversations or resurrect deleted Subjects. Subject/account cascades remove history.
 

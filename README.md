@@ -8,6 +8,8 @@ A private companion for practising and retaining learning. Externally provisione
 
 ```sh
 scripts/local.sh start                   # local Supabase; Studio: http://localhost:55423
+scripts/migrate.sh                       # apply pending migrations; preserve local data
+scripts/migrate.sh --force               # DELETE local data and replay all migrations (confirmation required)
 scripts/local.sh dev                     # application: http://localhost:3100
 scripts/local.sh stop                    # preserve local development data
 scripts/local.sh test tests/sign-in.spec.ts
@@ -16,6 +18,8 @@ scripts/local.sh check                   # typecheck + lint
 ```
 
 Tests create synthetic accounts, use real local Auth/Postgres/RLS plus a controlled email inbox, and run the standalone production application in Docker. The test run removes only its own services and data. Do not use production credentials in local tests.
+
+Migration commands require the local stack to be running. `--force` deletes local accounts, content and saved API keys; stop the app first. Neither mode targets hosted databases. If schema objects were previously applied without migration-history records, the default mode stops rather than guessing which records to repair; review history or deliberately rebuild with `--force`.
 
 See [authentication and setup](docs/authentication.md) for account provisioning, local email, runtime configuration, test isolation, free-plan limits and release checks. No deployment or live provisioning has been performed.
 
