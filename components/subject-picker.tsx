@@ -33,9 +33,9 @@ export default function SubjectPicker({ subjects, activeId }: { subjects: { id: 
     <DropdownMenu>
       <DropdownMenuTrigger aria-label="Switch subject" render={<Button variant="ghost" className="min-h-11 max-w-40 gap-1 text-xs font-normal text-muted-foreground" />}><span className="truncate">{subjects.find(subject => subject.id === activeId)?.name ?? 'Subjects'}</span><ChevronDown className="size-3 shrink-0" /></DropdownMenuTrigger>
       <DropdownMenuContent className="max-h-[70dvh] w-64 overflow-y-auto">
-        <DropdownMenuGroup><DropdownMenuLabel>Subject</DropdownMenuLabel><DropdownMenuRadioGroup value={activeId ?? ''} onValueChange={id => router.push(`/?subject=${id}`)}>{subjects.map(subject => <DropdownMenuRadioItem key={subject.id} value={subject.id} closeOnClick className="min-h-11"><span className="break-words">{subject.name}</span></DropdownMenuRadioItem>)}</DropdownMenuRadioGroup></DropdownMenuGroup>
+        <DropdownMenuGroup><DropdownMenuLabel>Subject</DropdownMenuLabel><DropdownMenuRadioGroup value={activeId ?? ''} onValueChange={id => { if (id !== activeId && window.dispatchEvent(new Event('document-navigation', { cancelable: true }))) router.push(`/?subject=${id}`); }}>{subjects.map(subject => <DropdownMenuRadioItem key={subject.id} value={subject.id} closeOnClick className="min-h-11"><span className="break-words">{subject.name}</span></DropdownMenuRadioItem>)}</DropdownMenuRadioGroup></DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="min-h-11" onClick={() => { setName(''); setError(''); setOpen(true); }}><Plus />Add subject</DropdownMenuItem>
+        <DropdownMenuItem className="min-h-11" onClick={() => { if (window.dispatchEvent(new Event('document-navigation', { cancelable: true }))) { setName(''); setError(''); setOpen(true); } }}><Plus />Add subject</DropdownMenuItem>
         <p className="px-2 py-2 text-xs leading-5 text-muted-foreground">Separate documents, learning trail and practice for each area of study.</p>
       </DropdownMenuContent>
     </DropdownMenu>
