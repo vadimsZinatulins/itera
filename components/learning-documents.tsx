@@ -10,8 +10,15 @@ import s from './learning-documents.module.css';
 import { documentId } from '@/lib/document-id';
 
 type Block = { id: string; markdown: string };
-type Draft = { id: string; subject_id: string; revision: number; title: string; description: string; blocks: Block[] };
-function assembled(doc: Draft) {
+type Snapshot = { revision: number; title: string; description: string; blocks: Block[] };
+type Draft = Snapshot & { id: string; subject_id: string; practice_version?: Snapshot | null };
+function documentStatus(doc: Draft) {
+  return !doc.practice_version ? 'Draft' : doc.practice_version.revision === doc.revision ? 'Available for practice' : 'Draft revision';
+}
+function searchable(doc: Snapshot) {
+  return `${doc.title} ${doc.description} ${doc.blocks.map(b => b.markdown).join(' ')}`;
+}
+function assembled(doc: Snapshot) {
   return [`# ${doc.title.trim() || 'Untitled Learning Document'}`, doc.description, ...doc.blocks.map(b => b.markdown)].filter(Boolean).join('\n\n') + '\n';
 }
 function Markdown({ children }: { children: string }) {
@@ -53,11 +60,12 @@ function DocumentWorkspace({ subjectId, sessions }: { subjectId: string; session
   const [editing, setEditing] = useState<Record<string, string>>(initial?.editing ?? {});
   const [removed, setRemoved] = useState<{ block: Block; index: number } | null>(null);
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('all');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
-  const [output, setOutput] = useState<'preview' | 'markdown' | null>(null);
+  const [output, setOutput] = useState<'preview' | 'markdown' | 'practice' | 'approve' | null>(null);
   const [newer, setNewer] = useState<Draft | null>(null);
   const dirty = hasUnsavedEdits({ draft, saved, editing, busy });
 
@@ -78,7 +86,7 @@ function DocumentWorkspace({ subjectId, sessions }: { subjectId: string; session
     return () => window.removeEventListener('document-discard', discard);
   }, [saved]);
   function leave() { return !dirty || window.confirm('Discard unsaved document edits? Cancel to stay and save your Draft.'); }
-  function open(doc: Draft) { setDraft(doc); setSaved(doc.revision ? doc : null); setEditing({}); setRemoved(null); setError(''); setStatus(doc.revision ? 'Saved on server · Draft' : 'Unsaved local edits'); setNewer(null); }
+  function open(doc: Draft) { setDraft(doc); setSaved(doc.revision ? doc : null); setEditing({}); setRemoved(null); setError(''); setStatus(doc.revision ? `Saved on server · ${documentStatus(doc)}` : 'Unsaved local edits'); setNewer(null); }
   function blocks(value: Block[]) { if (draft) setDraft({ ...draft, blocks: value }); }
   function insert(index: number) {
     if (!draft) return;
@@ -99,9 +107,22 @@ function DocumentWorkspace({ subjectId, sessions }: { subjectId: string; session
       if (!response.ok) { setError(result.error); setStatus('Save failed · unsaved local edits retained'); return; }
       setDraft(result); setSaved(result); setNewer(null);
       setDocuments(current => [result, ...current.filter(doc => doc.id !== result.id)]);
-      setStatus('Saved on server · Draft · not approved for practice');
+      setStatus(`Saved on server · ${documentStatus(result)} · ${result.practice_version ? 'Practice version unchanged' : 'not approved for practice'}`);
     } catch { setError('Save failed. Check your connection; your edits remain here.'); setStatus('Save failed · unsaved local edits retained'); }
     finally { setBusy(false); }
+  }
+  async function approve() {
+    if (!saved || dirty || busy) return;
+    setBusy(true); setError(''); setStatus('Approving…');
+    try {
+      const response = await fetch('/api/documents/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: saved.id, subjectId, revision: saved.revision }) });
+      const result = await response.json();
+      if (!response.ok) { setError(result.error); setStatus('Approval not confirmed · refresh and review'); return; }
+      setDraft(result); setSaved(result); setNewer(null);
+      setDocuments(current => [result, ...current.filter(doc => doc.id !== result.id)]);
+      setStatus('Saved on server · Available for practice · not demonstrated understanding');
+    } catch { setError('Approval could not be confirmed. Refresh and review before retrying.'); setStatus('Approval not confirmed'); }
+    finally { setBusy(false); setOutput(null); }
   }
   async function reviewSaved() {
     try {
@@ -117,18 +138,23 @@ function DocumentWorkspace({ subjectId, sessions }: { subjectId: string; session
     <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-2xl font-semibold">Learning Documents</h2><Button disabled={loading} onClick={() => open({ id: documentId(), subject_id: subjectId, revision: 0, title: '', description: '', blocks: [] })}>New Learning Document</Button></div>
     <Input aria-label="Search Learning Documents" placeholder="Search titles and content…" value={query} onChange={e => setQuery(e.target.value)} />
     {error && <p role="alert">{error}</p>}{loading && <p role="status">Loading documents…</p>}
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{documents.filter(doc => `${doc.title} ${doc.description} ${doc.blocks.map(b => b.markdown).join(' ')}`.toLowerCase().includes(query.toLowerCase())).map(doc => <button key={doc.id} className="min-w-0 space-y-2 rounded-xl border p-5 text-left hover:bg-muted focus-visible:ring-2" aria-label={`Open ${doc.title || 'Untitled Learning Document'}`} onClick={() => open(doc)}><h3 className="break-words font-medium">{doc.title || 'Untitled Learning Document'}</h3><p className="break-words text-sm text-muted-foreground">{doc.description}</p><p className="text-xs">Draft · {doc.blocks.length} blocks</p></button>)}</div>
+    <div className="flex flex-wrap gap-2" aria-label="Filter documents">{[['all', 'All'], ['draft', 'Drafts'], ['revision', 'Draft revisions'], ['practice', 'Available for practice']].map(([value, label]) => <Button key={value} variant={filter === value ? 'secondary' : 'ghost'} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</Button>)}</div>
+    <p className="text-xs text-muted-foreground">Only approved Practice versions are eligible. Draft revisions are excluded while the previous Practice version remains available.</p>
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{documents.filter(doc => (filter === 'all' || (filter === 'practice' ? !!doc.practice_version : filter === 'draft' ? !doc.practice_version : documentStatus(doc) === 'Draft revision')) && `${searchable(doc)} ${doc.practice_version ? searchable(doc.practice_version) : ''}`.toLowerCase().includes(query.toLowerCase())).map(doc => <button key={doc.id} className="min-w-0 space-y-2 rounded-xl border p-5 text-left hover:bg-muted focus-visible:ring-2" aria-label={`Open ${doc.title || 'Untitled Learning Document'}`} onClick={() => open(doc)}><h3 className="break-words font-medium">{doc.title || 'Untitled Learning Document'}</h3><p className="break-words text-sm text-muted-foreground">{doc.description}</p><p className="text-xs">{documentStatus(doc)} · {doc.blocks.length} blocks{documentStatus(doc) === 'Draft revision' ? ' · approved version available for practice' : ''}</p></button>)}</div>
     {!loading && !documents.length && <p>No Learning Documents yet. Create a Draft to capture study material.</p>}
   </section>;
-  const markdown = saved ? assembled(saved) : '';
+  const selected = output === 'practice' ? saved?.practice_version : saved;
+  const markdown = selected ? assembled(selected) : '';
   return <section className="mx-auto mt-8 max-w-4xl space-y-5" aria-label="Document editor">
     <Button variant="ghost" disabled={busy} onClick={() => { if (leave()) { setDraft(null); setEditing({}); setError(''); } }}>All Learning Documents</Button>
     <fieldset disabled={busy} className="min-w-0 space-y-5">
       <label className="grid gap-2">Document title<Input value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} /></label>
       <label className="grid gap-2">Document description<Textarea value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })} /></label>
-      <p className="text-sm">Draft · Saving is not approval or demonstrated understanding. Practice approval is not available yet.</p>
+      <p className="text-sm">{dirty && draft.practice_version ? 'Draft revision' : documentStatus(draft)} · {draft.practice_version ? 'Only the approved snapshot is eligible; later Draft changes stay out of practice.' : 'Drafts are excluded from practice.'} Approval means material encountered, not demonstrated understanding.</p>
       <div className="flex flex-wrap gap-2"><Button disabled={!dirty || Object.keys(editing).length > 0} onClick={save}>Save as Draft</Button><Button variant="outline" disabled={!saved} onClick={() => setOutput('preview')}>Document preview</Button><Button variant="outline" disabled={!saved} onClick={() => setOutput('markdown')}>Final Markdown</Button></div>
-      <p role="status">{busy ? 'Saving…' : dirty && !error ? 'Unsaved local edits · not saved on server' : status}</p>
+      <div className="flex flex-wrap gap-2"><Button disabled={dirty || !saved || !saved.title.trim() || !saved.blocks.some(b => /[\p{L}\p{N}]/u.test(b.markdown)) || saved.practice_version?.revision === saved.revision} onClick={() => setOutput('approve')}>{saved?.practice_version ? 'Update practice version' : 'Ready to Practice'}</Button>{saved?.practice_version && <Button variant="outline" onClick={() => setOutput('practice')}>View practice version</Button>}{dirty && saved && <Button variant="outline" onClick={() => { setDraft(saved); setEditing({}); setRemoved(null); setError(''); setStatus(`Saved on server · ${documentStatus(saved)}`); }}>Discard local edits</Button>}</div>
+      {dirty && <p className="text-sm">Save or discard outstanding edits before approval. Open blocks must be saved locally or cancelled first.</p>}
+      <p role="status">{busy ? status : dirty && !error ? 'Unsaved local edits · not saved on server' : status}</p>
       {error && <div className="space-y-2"><p role="alert">{error}</p><Button variant="outline" onClick={reviewSaved}>Refresh and review saved version</Button></div>}
       <p className="text-xs text-muted-foreground">Save or cancel open blocks before saving the Draft. Block saves are local until Save as Draft succeeds. Unsaved edits are kept only in this session; not offline recovery. Double-click a block to edit, or use Edit.</p>
       {draft.blocks.map((block, index) => <Fragment key={block.id}>
@@ -144,6 +170,6 @@ function DocumentWorkspace({ subjectId, sessions }: { subjectId: string; session
       {removed && <div className="flex flex-wrap items-center gap-3"><p>Block removed.</p><Button variant="outline" onClick={() => { const next = [...draft.blocks]; next.splice(Math.min(removed.index, next.length), 0, removed.block); blocks(next); setRemoved(null); }}>Undo delete</Button></div>}
     </fieldset>
     {newer && <aside className="space-y-4 rounded-xl border p-4"><h2 className="font-semibold">Latest saved version · your attempted edits remain above</h2><Markdown>{assembled(newer)}</Markdown><Button variant="outline" onClick={() => { if (window.confirm('Discard your attempted edits and use this saved version?')) open(newer); }}>Discard attempted edits and use saved version</Button></aside>}
-    <Dialog open={!!output} onOpenChange={value => { if (!value) setOutput(null); }}><DialogContent className="flex max-h-[90dvh] flex-col sm:max-w-4xl"><DialogTitle>{output === 'preview' ? 'Document preview' : 'Final Markdown'}</DialogTitle><DialogDescription>Saved Draft only, in block order. Unsaved edits are excluded. Exporting does not approve material and is not an account backup.</DialogDescription><div className="min-h-0 overflow-auto">{output === 'preview' ? <Markdown>{markdown}</Markdown> : <pre className="whitespace-pre-wrap break-words">{markdown}</pre>}</div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(markdown); setStatus('Saved Draft Markdown copied.'); } catch { setStatus('Clipboard unavailable. Select text in Final Markdown to copy.'); } }}>Copy Markdown</Button><Button onClick={() => { const url = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown;charset=utf-8' })); const a = window.document.createElement('a'); a.href = url; a.download = (saved?.title.replace(/[^a-z0-9-]+/gi, '-') || 'learning-document') + '.md'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }}>Download .md</Button></div></DialogContent></Dialog>
+    <Dialog open={!!output} onOpenChange={value => { if (!value && !busy) setOutput(null); }}><DialogContent className="flex max-h-[90dvh] flex-col sm:max-w-4xl"><DialogTitle>{output === 'practice' ? 'Approved practice version' : output === 'approve' ? 'Review saved version for practice' : output === 'preview' ? 'Document preview' : 'Final Markdown'}</DialogTitle><DialogDescription>{output === 'practice' ? 'Only this approved snapshot is eligible. Draft revisions are excluded.' : output === 'approve' ? 'Approve this complete saved snapshot only after review. Approval means material encountered, not demonstrated understanding.' : 'Saved Draft only, in block order. Unsaved edits are excluded. Exporting does not approve material and is not an account backup.'}</DialogDescription><div className="min-h-0 overflow-auto">{output !== 'markdown' ? <Markdown>{markdown}</Markdown> : <pre className="whitespace-pre-wrap break-words">{markdown}</pre>}</div><div className="flex flex-wrap gap-2">{output === 'approve' && <Button disabled={busy || dirty} onClick={approve}>{busy ? 'Approving…' : 'Approve saved version'}</Button>}<Button variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(markdown); setStatus(`${output === 'practice' ? 'Practice version' : 'Saved Draft'} Markdown copied.`); } catch { setStatus('Clipboard unavailable. Select text in Final Markdown to copy.'); } }}>Copy Markdown</Button><Button onClick={() => { const url = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown;charset=utf-8' })); const a = window.document.createElement('a'); a.href = url; a.download = (selected?.title.replace(/[^a-z0-9-]+/gi, '-') || 'learning-document') + '.md'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }}>Download .md</Button></div></DialogContent></Dialog>
   </section>;
 }

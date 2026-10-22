@@ -19,11 +19,13 @@ test('save ordered Drafts across sessions and reject stale writes', async ({ pag
     await browserSignIn(second, account.email);
     await second.goto(`/?subject=${subject.id}`);
     await second.getByRole('button', { name: 'Open Motion', exact: true }).click();
+    await page.getByRole('article', { name: 'Block 1', exact: true }).hover();
     await page.getByRole('button', { name: 'Edit block 1', exact: true }).click();
     await page.getByLabel('Block 1 Markdown').fill('Newer saved text');
     await page.getByLabel('Block 1 Markdown').press('Control+Enter');
     await page.getByRole('button', { name: 'Save as Draft', exact: true }).click();
     await expect(page.getByRole('status')).toContainText('Saved on server');
+    await second.getByRole('article', { name: 'Block 1', exact: true }).hover();
     await second.getByRole('button', { name: 'Edit block 1', exact: true }).click();
     await second.getByLabel('Block 1 Markdown').fill('Older session attempted text');
     await second.getByRole('button', { name: 'Save block', exact: true }).click();
