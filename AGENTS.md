@@ -14,11 +14,15 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Start and stop the Next.js app through Docker. Use host-side `docker` commands to build, run, execute commands in, and stop containers; execute application/tooling commands inside the container.
 - Use the existing `Dockerfile` and update it as needed. If Docker is unavailable, report the blocker; never fall back to host-side Node tooling.
 
+## Branch workflow
+
+- `main` is the integration branch for production code, prototype references, and live planning documentation.
+- Start each implementation on a new feature branch from current `main`. Implement and test there, then merge back to `main` after the relevant Docker checks/tests pass. Include related documentation and issue-status updates in the same branch.
+
 ## Prototype and live planning references
 
-- **Prototype — `prototype/main-workflow`:** contains the project prototype and can be freely inspected. Consult it when designing or implementing workflows and UI. It is a design reference, not production-ready code.
-- **Live documentation — `docs/production-plan`:** contains the evolving production plan. Before changing product behaviour, domain concepts, or architecture, consult the relevant planning notes under `.scratch/production-release/`, `GLOSSARY.md`, and `docs/adr/` on this branch. Distinguish confirmed decisions from proposals and explicit deferrals; the documentation can change.
-- Read another branch with `git show <branch>:<path>` or a separate worktree when needed. Do not switch away from the current working branch merely to inspect a reference.
+- **Prototype — `app/*.prototype.tsx`, `app/*.prototype.module.css`, and `components/prototype-switcher.tsx`:** consult when designing or implementing workflows and UI. These are design references, not production-ready code; keep the production entry point and authentication intact. Historical prototype walkthroughs may describe the old branch's runtime rather than the current application.
+- **Live documentation — `.scratch/production-release/`, `GLOSSARY.md`, and `docs/adr/`:** consult relevant notes before changing product behaviour, domain concepts, or architecture. Distinguish confirmed decisions from proposals and explicit deferrals; the documentation evolves alongside implementation.
 
 ## Agent skills
 

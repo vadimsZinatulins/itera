@@ -19,9 +19,13 @@ Tests create synthetic accounts, use real local Auth/Postgres/RLS plus a control
 
 See [authentication and setup](docs/authentication.md) for account provisioning, local email, runtime configuration, test isolation, free-plan limits and release checks. No deployment or live provisioning has been performed.
 
+## Branch workflow
+
+`main` contains the current implementation, prototype design references, and production planning. Create a new feature branch from current `main` for each implementation; update code and related docs, run the relevant Docker checks/tests above, then merge back to `main`. Separate long-lived prototype and planning branches are no longer required.
+
 ## References
 
 - `GLOSSARY.md`: domain language.
-- `prototype/main-workflow`: prototype design reference, not production authentication.
-- `docs/production-plan`: accepted plan, architecture decision and issue specifications.
+- `app/*.prototype.tsx` and `app/*.prototype.module.css`: prototype design references, not production authentication or routes. Historical prototype launch instructions do not describe the current production entry point.
+- [Production spec](.scratch/production-release/spec.md), [planning history](.scratch/production-release/planning.md), [issue specifications](.scratch/production-release/issues/), and [architecture decisions](docs/adr/).
 - [Dockerized Supabase CLI research](.scratch/production-release/research/supabase-cli-in-docker.md).
