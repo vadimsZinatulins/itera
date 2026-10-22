@@ -8,6 +8,7 @@ if (!publicKey || !adminKey) throw new Error('Local Supabase keys missing from s
 const api = `http://supabase_kong_${project}:8000`;
 writeFileSync(`${destination}/app.env`, [
   `SUPABASE_URL=${project.startsWith('itera-owner-test-') ? 'http://upstream.test:8080' : api}`, `SUPABASE_PUBLISHABLE_KEY=${publicKey}`, `APP_ORIGIN=${origin}`,
+  `SUPABASE_SERVICE_ROLE_KEY=${adminKey}`,
 ].join('\n'), { mode: 0o600 });
 writeFileSync(`${destination}/test.env`, [
   `TEST_BASE_URL=${origin}`, `TEST_SUPABASE_URL=${api}`,
