@@ -59,7 +59,7 @@ http.createServer((request, response) => {
             event({ type: 'response.output_text.delta', delta: responseMode === 'oversized' ? 'x'.repeat(17000) : 'your study goals.' });
             if (responseMode !== 'disconnect') event({ type: responseMode === 'completed' ? 'response.completed' : 'response.incomplete', response: { status: responseMode } });
             response.end();
-          }, 75);
+          }, responseMode === 'slow' ? 3000 : 75);
           return;
         }
         send(200, { status: responseMode, output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }] }); return;
