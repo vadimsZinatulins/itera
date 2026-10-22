@@ -98,7 +98,13 @@ export async function POST(request: Request) {
             send({ sources: provenance.data.sources });
             if (!material.length) throw new SettingsError('No approved sources in this Subject. Create a Learning Document and choose Ready to Practice. Goals and organisation chat remains available with practice switched off.', 422);
           }
-          for await (const event of streamConversation(context, abort.signal, material)) {
+          let reviewed: unknown[] = [];
+          if (input.practice) {
+            const observations = await client.from('reviewed_observations').select('observation,coverage_from,coverage_to').eq('account_id', account.id).eq('subject_id', input.subject).order('created_at');
+            if (observations.error) throw new SettingsError('Reviewed understanding could not be loaded. No generation was started.');
+            reviewed = observations.data;
+          }
+          for await (const event of streamConversation(context, abort.signal, material, reviewed)) {
             if (event.delta) {
               if (new TextEncoder().encode(text + event.delta).length > 16000) throw new Error('Output limit');
               text += event.delta;
