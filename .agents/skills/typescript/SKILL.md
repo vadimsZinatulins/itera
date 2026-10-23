@@ -23,6 +23,8 @@ Validate untrusted inputs at trusted boundaries: requests, external responses, s
 
 Use `safeParse` or `safeParseAsync` for expected validation failures. Infer types from schemas instead of maintaining parallel declarations; distinguish schema input and output types when transformations change the shape.
 
+Validate once per trust boundary, then let downstream code rely on the established invariants. For example, a client calculation consuming a form value already validated as greater than zero can use it directly. An input attribute alone is not proof: ensure the calculation receives the validated value. The backend independently validates API input because callers can bypass the frontend. Add guards for reachable invalid states, not hypothetical violations of an established contract.
+
 Accept `unknown` at untrusted boundaries and narrow it. Prefer inference, explicit modeling, and checked narrowing over `any`, unchecked type assertions, and non-null assertions. Model mutually exclusive states with discriminated unions rather than independent booleans.
 
 ## Forms — React Hook Form
@@ -67,7 +69,9 @@ Pure functions without an expected failure path return ordinary values. Retain l
 
 Represent expected application failures with results instead of explicit throws. Catch third-party exceptions at integration boundaries and translate known failures into typed errors. Preserve framework-required control flow, including redirect/not-found mechanisms, rather than swallowing it in broad catches. Keep unexpected defects observable through the project's error-reporting path instead of silently turning them into success or ignoring them.
 
-Return safe user-facing messages. Keep credentials, raw provider errors, and private content out of public responses and unsafe logs.
+Model error categories around distinct UI behavior or recovery actions, not an exhaustive catalog of backend failure causes. When several failures lead to the same generic retry state, use one shared category and a safe message such as "Something went wrong. Please try again." Add a distinct category only when the caller needs different UI handling, such as field correction or reauthentication.
+
+Separate public error information from private diagnostics. An internal error may carry a diagnostic message or cause for logging, but explicitly serialize only safe public fields in backend responses. Keep diagnostic detail out of user-visible messages and client payloads; redact credentials and private content before logging.
 
 ## Readability
 
@@ -84,6 +88,12 @@ if (error !== null) {
 Apply the same block style to other control flow. Keep concise expressions where they remain easy to scan, such as `items.map(getId)`. Prefer named intermediate values over nested ternaries, compressed chains, or several operations on one line.
 
 In React, derive values during rendering when possible. Use Effects for external synchronization and the browser-local date display rule above, rather than maintaining redundant copies of derived state. Keep state close to its owner.
+
+## Live code and invariants
+
+Keep only code needed by current behavior. Remove zombie code made obsolete by the change: unused imports, variables, functions, unreachable branches, commented-out implementations, and superseded compatibility paths. Confirm references and framework entry points before removing apparently unused code; keep unrelated cleanup outside the task scope.
+
+Implement protections for actual boundary risks and reachable failure states. Rely on validated contracts internally instead of adding speculative guards, silent fallback values, or abstractions for scenarios the application does not support. When a contract is unclear, establish where it is enforced rather than layering defensive checks throughout its consumers.
 
 ## Completion
 
