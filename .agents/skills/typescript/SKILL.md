@@ -1,6 +1,6 @@
 ---
 name: typescript
-description: TypeScript/TSX coding standards. Use when writing, modifying, or reviewing .ts or .tsx files: library selection, validation, forms, UI, dates, errors, and readability.
+description: "TypeScript/TSX coding standards. Use when writing, modifying, or reviewing .ts or .tsx files: library selection, validation, forms, UI, dates, errors, and readability."
 ---
 
 # TypeScript and TSX
