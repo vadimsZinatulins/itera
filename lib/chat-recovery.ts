@@ -1,5 +1,5 @@
 // Device-only personal text. No credentials or server history belong here.
-export type ChatOperation = { subject: string; conversation: string; operation: string; text: string; practice: boolean };
+export type ChatOperation = { subject: string; conversation: string; operation: string; text: string; practice: boolean; assessmentRevision?: number };
 type Recovery = { text: string; practice: boolean; operation: ChatOperation | null };
 const prefix = 'learning-companion:chat:v1:';
 const key = (account: string, subject: string, conversation: string) => `${prefix}${account}:${subject}:${conversation || 'new'}`;
@@ -9,7 +9,7 @@ export function readChatRecovery(account: string, subject: string, conversation:
     const value = JSON.parse(localStorage.getItem(key(account, subject, conversation)) ?? 'null');
     if (!value || typeof value.text !== 'string' || typeof value.practice !== 'boolean') return null;
     const op = value.operation;
-    if (op && (op.subject !== subject || (conversation && op.conversation !== conversation) || typeof op.conversation !== 'string' || typeof op.operation !== 'string' || op.text !== value.text || op.practice !== value.practice)) return null;
+    if (op && (op.subject !== subject || (conversation && op.conversation !== conversation) || typeof op.conversation !== 'string' || typeof op.operation !== 'string' || op.text !== value.text || op.practice !== value.practice || (op.assessmentRevision !== undefined && (!Number.isSafeInteger(op.assessmentRevision) || op.assessmentRevision < 0)))) return null;
     return { text: value.text, practice: value.practice, operation: op ?? null };
   } catch { return null; }
 }

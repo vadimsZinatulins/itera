@@ -2,6 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import { authClient, currentAccount } from '@/lib/auth/server';
 import { authConfig } from '@/lib/auth/config';
 import { SettingsError, streamConversation } from '@/lib/openai/server';
+import { assessmentInstructions, assessmentRequested, readAssessmentOutput } from '@/lib/assessments/server';
+import type { Assessment } from '@/lib/assessment';
 
 export const maxDuration = 90;
 const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -25,7 +27,7 @@ export async function GET(request: Request) {
     const ownedConversation = await client.from('conversations').select('id').eq('id', conversation).eq('subject_id', subject).eq('account_id', account.id).maybeSingle();
     if (ownedConversation.error) return reply({ error: 'Could not load conversation.' }, 503);
     if (!ownedConversation.data) return reply({ error: 'Conversation unavailable.' }, 404);
-    const { data, error } = await client.from('conversation_turns').select('id,ordinal,user_text,assistant_text,status,pending_until,practice,sources').eq('account_id', account.id).eq('conversation_id', conversation).order('ordinal');
+    const { data, error } = await client.from('conversation_turns').select('id,ordinal,user_text,assistant_text,status,pending_until,practice,sources,assessment').eq('account_id', account.id).eq('conversation_id', conversation).order('ordinal');
     return error ? reply({ error: 'Could not load conversation.' }, 503) : reply(data);
   } catch { return reply({ error: 'Could not load conversations. Try again.' }, 503); }
 }
@@ -52,15 +54,16 @@ export async function POST(request: Request) {
     try { parsed = JSON.parse(new TextDecoder().decode(bytes)); } catch { return reply({ error: 'Invalid message.' }, 400); }
     if (!parsed || typeof parsed !== 'object') return reply({ error: 'Invalid message.' }, 400);
     const values = parsed as Record<string, unknown>;
-    if (Object.keys(values).some(key => !['subject', 'conversation', 'operation', 'text', 'practice'].includes(key)) || !uuid(values.subject) || !uuid(values.conversation) || !uuid(values.operation) || typeof values.text !== 'string' || !values.text.trim()) return reply({ error: 'Invalid message.' }, 400);
+    if (Object.keys(values).some(key => !['subject', 'conversation', 'operation', 'text', 'practice', 'assessmentRevision'].includes(key)) || !uuid(values.subject) || !uuid(values.conversation) || !uuid(values.operation) || typeof values.text !== 'string' || !values.text.trim()) return reply({ error: 'Invalid message.' }, 400);
     if ('practice' in values && typeof values.practice !== 'boolean') return reply({ error: 'Invalid practice selection.' }, 400);
-    const input = { subject: values.subject, conversation: values.conversation, operation: values.operation, text: values.text, practice: values.practice === true };
+    if ('assessmentRevision' in values && (!Number.isSafeInteger(values.assessmentRevision) || (values.assessmentRevision as number) < 0)) return reply({ error: 'Invalid assessment revision.' }, 400);
+    const input = { subject: values.subject, conversation: values.conversation, operation: values.operation, text: values.text, practice: values.practice === true, assessmentRevision: values.assessmentRevision as number | undefined };
     if (new TextEncoder().encode(input.text).length > 8000) return reply({ error: 'Message too large (8,000 UTF-8 bytes maximum).' }, 413);
     const client = await authClient();
-    const saved = await client.rpc('send_conversation_message', { p_subject: input.subject, p_conversation: input.conversation, p_operation: input.operation, p_text: input.text, p_practice: input.practice });
+    const saved = await client.rpc('send_conversation_message', { p_subject: input.subject, p_conversation: input.conversation, p_operation: input.operation, p_text: input.text, p_practice: input.practice, p_assessment_revision: input.assessmentRevision ?? null });
     if (saved.error) {
       const code = saved.error.code;
-      return reply({ error: code === '40001' ? 'A reply is already in progress. Return shortly.' : code === '22023' ? 'Message or conversation context limit reached, or operation identity changed. Use a new thread for more context.' : code === '42501' ? 'Subject or conversation unavailable.' : 'Message could not be saved. Retry the same send to avoid duplication.' }, code === '40001' ? 409 : code === '22023' ? 400 : code === '42501' ? 403 : 503);
+      return reply({ error: code === '40001' ? 'A reply is already in progress or the assessment changed. Reload before answering; your text is preserved.' : code === '22023' ? 'Message or conversation context limit reached, or operation identity changed. Use a new thread for more context.' : code === '42501' ? 'Subject or conversation unavailable.' : 'Message could not be saved. Retry the same send to avoid duplication.' }, code === '40001' ? 409 : code === '22023' ? 400 : code === '42501' ? 403 : 503);
     }
     if (!saved.data) return reply({ saved: true, duplicate: true, conversation: input.conversation });
     const abort = new AbortController();
@@ -68,7 +71,7 @@ export async function POST(request: Request) {
     request.signal.addEventListener('abort', () => abort.abort(), { once: true });
     const stream = new ReadableStream({
       async start(controller) {
-        let text = '', complete = false, lastCheckpoint = 0;
+        let text = '', complete = false, lastCheckpoint = 0, assessmentSaved = false;
         let error = 'Reply incomplete. No automatic generation retry was made; another request may incur another charge.';
         const send = (value: object) => { try { controller.enqueue(new TextEncoder().encode(JSON.stringify(value) + '\n')); } catch { abort.abort(); } };
         const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -98,20 +101,42 @@ export async function POST(request: Request) {
             send({ sources: provenance.data.sources });
             if (!material.length) throw new SettingsError('No approved sources in this Subject. Create a Learning Document and choose Ready to Practice. Goals and organisation chat remains available with practice switched off.', 422);
           }
-          for await (const event of streamConversation(context, abort.signal, material)) {
-            if (event.delta) {
-              if (new TextEncoder().encode(text + event.delta).length > 16000) throw new Error('Output limit');
-              text += event.delta;
-              if (Date.now() - lastCheckpoint > 500) { await persist(false); lastCheckpoint = Date.now(); }
-              send({ delta: event.delta });
-            }
-            if (event.complete && text.trim()) complete = true;
+          let reviewed: unknown[] = [];
+          if (input.practice) {
+            const observations = await client.from('reviewed_observations').select('observation,coverage_from,coverage_to').eq('account_id', account.id).eq('subject_id', input.subject).order('created_at');
+            if (observations.error) throw new SettingsError('Reviewed understanding could not be loaded. No generation was started.');
+            reviewed = observations.data;
           }
+          const snapshot = await client.from('conversation_turns').select('assessment_context').eq('id', input.operation).single();
+          if (snapshot.error) throw new SettingsError('Assessment progress could not be loaded. No generation was started.');
+          const state = snapshot.data.assessment_context?.revision !== undefined ? snapshot.data.assessment_context as Assessment : null;
+          const assessing = input.practice && (state !== null || assessmentRequested(input.text));
+          const plan = assessing ? assessmentInstructions(state, input.text) : null;
+          let raw = '', providerComplete = false;
+          for await (const event of streamConversation(context, abort.signal, material, reviewed, plan?.instructions)) {
+            if (event.delta) {
+              if (new TextEncoder().encode(raw + event.delta).length > 16000) throw new Error('Output limit');
+              raw += event.delta;
+              if (!assessing) {
+                text = raw;
+                if (Date.now() - lastCheckpoint > 500) { await persist(false); lastCheckpoint = Date.now(); }
+                send({ delta: event.delta });
+              }
+            }
+            if (event.complete && raw.trim()) providerComplete = true;
+          }
+          if (plan && providerComplete) {
+            const output = readAssessmentOutput(raw, state, input.text, plan);
+            const result = await writer.rpc('server_assessment_reply', { p_owner: account.id, p_subject: input.subject, p_conversation: input.conversation, p_operation: input.operation, p_text: output.reply, p_topic: output.topic, p_requested_difficulty: output.requested_difficulty, p_action: output.action, p_question: output.question, p_difficulty: output.difficulty, p_budget: output.budget });
+            if (result.error || !result.data) throw new SettingsError('Assessment changed or progress could not be saved. Reload to inspect it. No automatic retry was made.');
+            assessmentSaved = true; text = output.reply; complete = true;
+            send({ delta: text, assessment: result.data });
+          } else if (!assessing) complete = providerComplete;
         } catch (cause) {
           if (cause instanceof SettingsError) error = cause.message;
         } finally {
           clearTimeout(timeout);
-          try { await persist(true); send({ status: complete ? 'complete' : 'incomplete', ...(complete ? {} : { error }) }); }
+          try { if (!assessmentSaved) await persist(true); send({ status: complete ? 'complete' : 'incomplete', ...(complete ? {} : { error }) }); }
           catch { send({ status: 'incomplete', error: 'Reply persistence could not be confirmed. Reload to check saved history. No automatic generation retry was made.' }); }
           try { controller.close(); } catch { /* Client disconnected. */ }
         }
