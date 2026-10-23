@@ -4,9 +4,9 @@
 
 **Blocked by:** 09 — Review incremental recaps into Subject understanding.
 
-**Status:** ready-for-human
+**Status:** closed — implemented and manually accepted
 
-**Implementation:** `feat/10-11-adaptive-assessment-budgets`, created from `main`. Adaptive assessment implemented first; soft-budget pacing follows in issue 11 on the same branch. Manual acceptance pending.
+**Implementation:** `feat/10-11-adaptive-assessment-budgets`, created from `main`. Adaptive assessment implemented first; soft-budget pacing follows in issue 11 on the same branch. The owner confirmed manual testing passed and accepted the implementation.
 
 - [x] Quick assessment is reachable from the existing chat experience and resumes an unfinished activity rather than silently creating another conversation. Support ordinary-language assessment requests as well as the entry action.
 - [x] Respect an explicitly requested topic and easy/medium/hard difficulty. When unspecified, AI may choose each question's difficulty and number of questions; do not enforce a hard three-question sequence or a fixed topic list.
@@ -20,4 +20,4 @@
 
 ## Verification
 
-Docker typecheck/lint and production build passed. Final combined public-boundary suite passed (43 tests), including adaptive questions, qualified recap provenance across reviewed checkpoints, resumption/recovery, stale/replayed sends, model action/difficulty violations, source isolation and direct-data denial. Controlled provider responses only; no live charged requests or deployment. Apply migrations 009–010 with the Docker migration runner. Soft-budget verification is recorded with issue 11. Manual acceptance pending; left on the requested feature branch.
+Docker typecheck/lint and production build passed. Final combined public-boundary suite passed (43 tests), including adaptive questions, qualified recap provenance across reviewed checkpoints, resumption/recovery, stale/replayed sends, model action/difficulty violations, source isolation and direct-data denial. Automated verification used controlled provider responses; no live charged requests or deployment performed by the agent. Apply migrations 009–010 with the Docker migration runner. Soft-budget verification is recorded with issue 11. The owner confirmed all manual testing passed. Left on the requested feature branch; not merged into `main`.
