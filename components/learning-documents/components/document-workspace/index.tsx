@@ -12,7 +12,7 @@ import DocumentList from '../document-list';
 import DocumentOutput from '../document-output';
 import type { DocumentOutputMode } from '../document-output/types';
 import Markdown from '../markdown';
-import type { DocumentWorkspaceProps, RemovedBlock } from './types';
+import type { DocumentReadState, DocumentWorkspaceProps, RemovedBlock } from './types';
 import s from '../../learning-documents.module.css';
 
 export default function DocumentWorkspace({ subjectId, sessions }: DocumentWorkspaceProps) {
@@ -25,7 +25,7 @@ export default function DocumentWorkspace({ subjectId, sessions }: DocumentWorks
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [readState, setReadState] = useState<DocumentReadState>({ status: 'loading' });
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
   const [output, setOutput] = useState<DocumentOutputMode | null>(null);
@@ -43,10 +43,11 @@ export default function DocumentWorkspace({ subjectId, sessions }: DocumentWorks
       }
       if (readError !== null) {
         setError(readError.message);
+        setReadState({ status: 'unavailable', message: readError.message });
       } else {
         setDocuments(data);
+        setReadState({ status: 'ready' });
       }
-      setLoading(false);
     });
     return () => {
       active = false;
@@ -166,7 +167,7 @@ export default function DocumentWorkspace({ subjectId, sessions }: DocumentWorks
     setNewer(match);
   }
   if (!draft) {
-    return <DocumentList documents={documents} loading={loading} error={error} query={query} filter={filter}
+    return <DocumentList documents={documents} loading={readState.status === 'loading'} error={readState.status === 'unavailable' ? readState.message : ''} query={query} filter={filter}
       onQueryChange={setQuery} onFilterChange={setFilter} onOpen={open}
       onCreate={() => open({ id: documentId(), subject_id: subjectId, revision: 0, title: '', description: '', blocks: [] })} />;
   }

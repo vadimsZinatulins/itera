@@ -145,6 +145,13 @@ test('invalid JSON, wrong-shaped document lists and failed reads never masquerad
       await expect(page.getByText('unsafe synthetic diagnostic', { exact: false })).toHaveCount(0);
       await page.unroute('**/api/documents?subject=*');
     }
+    // Opening and discarding a local Draft must not turn an unavailable list into a successful empty read.
+    await page.getByRole('button', { name: 'New Learning Document', exact: true }).click();
+    page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('button', { name: 'All Learning Documents', exact: true }).click();
+    const workspace = page.getByRole('region', { name: 'Learning Documents', exact: true });
+    await expect(workspace.getByRole('alert')).toHaveText('Could not load documents. Reload to try again.');
+    await expect(workspace.getByText('No Learning Documents yet.', { exact: false })).toHaveCount(0);
     await page.reload();
     await expect(page.getByText('No Learning Documents yet.', { exact: false })).toBeVisible();
   } finally {
