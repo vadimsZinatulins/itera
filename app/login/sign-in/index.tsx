@@ -76,10 +76,10 @@ export default function SignIn() {
     requestAnimationFrame(() => setFocus('email'));
   }
 
-  const submitRequest = handleSubmit(requestCode, () => {
+  function clearRequestFeedback() {
     setOperationError('');
     setNotice('');
-  });
+  }
 
   return <>
     <p className="mb-6 flex items-center gap-2 text-sm font-medium"><Leaf aria-hidden="true" className="size-5" />Learning Companion</p>
@@ -89,7 +89,9 @@ export default function SignIn() {
         <form className="space-y-4" noValidate={!sentTo} aria-busy={busy} onSubmit={sentTo ? event => {
           event.preventDefault();
           void verifyCode();
-        } : submitRequest}>
+        } : event => {
+          void handleSubmit(requestCode, clearRequestFeedback)(event);
+        }}>
           {sentTo ? <>
             <p className="break-words text-sm">Enter the email code for <strong>{sentTo}</strong>.</p>
             <label className="block text-sm" htmlFor="code">Email code</label>
@@ -102,7 +104,7 @@ export default function SignIn() {
         </form>
         <div id="sign-in-status" aria-label="Sign-in status" role={error ? 'alert' : 'status'} className="text-sm leading-6"><span id="sign-in-message">{error || notice}</span></div>
         {sentTo && <div className="flex flex-wrap gap-2">
-          <Button variant="outline" className="min-h-11" disabled={busy} onClick={() => void submitRequest()}>Send another code</Button>
+          <Button variant="outline" className="min-h-11" disabled={busy} onClick={() => void handleSubmit(requestCode, clearRequestFeedback)()}>Send another code</Button>
           <Button variant="ghost" className="min-h-11" disabled={busy} onClick={changeEmail}>Change email</Button>
         </div>}
         <p className="text-xs leading-5 text-muted-foreground">Account access is set up outside this application. Public signup is not available.</p>
