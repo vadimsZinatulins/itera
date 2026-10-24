@@ -4,32 +4,20 @@ import { authConfig } from '@/lib/auth/config';
 import { SettingsError, streamConversation } from '@/lib/openai/server';
 import { assessmentInstructions, assessmentRequested, readAssessmentOutput } from '@/lib/assessments/server';
 import type { Assessment } from '@/lib/assessment';
+import { readConversations } from '@/lib/conversations/actions/read-conversations';
+import { conversationReadErrorResponse } from '@/lib/conversations/helpers/failures';
+import { readSubmission } from '@/lib/conversations/actions/read-submission';
 
 export const maxDuration = 90;
-const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 
 export async function GET(request: Request) {
-  try {
-    const account = await currentAccount();
-    if (!account) return reply({ error: 'Sign in required.' }, 401);
-    const params = new URL(request.url).searchParams;
-    const subject = params.get('subject'), conversation = params.get('conversation');
-    if (!uuid(subject) || (conversation !== null && !uuid(conversation))) return reply({ error: 'Invalid conversation scope.' }, 400);
-    const client = await authClient();
-    const owned = await client.from('subjects').select('id').eq('id', subject).eq('account_id', account.id).maybeSingle();
-    if (owned.error) return reply({ error: 'Could not load trail.' }, 503);
-    if (!owned.data) return reply({ error: 'Subject unavailable.' }, 404);
-    if (!conversation) {
-      const { data, error } = await client.from('conversations').select('id,title,created_at').eq('account_id', account.id).eq('subject_id', subject).order('created_at', { ascending: false });
-      return error ? reply({ error: 'Could not load trail.' }, 503) : reply(data);
-    }
-    const ownedConversation = await client.from('conversations').select('id').eq('id', conversation).eq('subject_id', subject).eq('account_id', account.id).maybeSingle();
-    if (ownedConversation.error) return reply({ error: 'Could not load conversation.' }, 503);
-    if (!ownedConversation.data) return reply({ error: 'Conversation unavailable.' }, 404);
-    const { data, error } = await client.from('conversation_turns').select('id,ordinal,user_text,assistant_text,status,pending_until,practice,sources,assessment').eq('account_id', account.id).eq('conversation_id', conversation).order('ordinal');
-    return error ? reply({ error: 'Could not load conversation.' }, 503) : reply(data);
-  } catch { return reply({ error: 'Could not load conversations. Try again.' }, 503); }
+  const params = new URL(request.url).searchParams;
+  const [error, conversations] = await readConversations(params.get('subject'), params.get('conversation'));
+  if (error !== null) {
+    return conversationReadErrorResponse(error);
+  }
+  return reply(conversations);
 }
 
 export async function POST(request: Request) {
@@ -37,28 +25,11 @@ export async function POST(request: Request) {
   try {
     const account = await currentAccount();
     if (!account) return reply({ error: 'Sign in required.' }, 401);
-    // Read a bounded body, including clients without Content-Length.
-    const reader = request.body?.getReader();
-    if (!reader) return reply({ error: 'Message required.' }, 400);
-    const chunks: Uint8Array[] = []; let size = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > 12000) { await reader.cancel(); return reply({ error: 'Message too large (8,000 UTF-8 bytes maximum).' }, 413); }
-      chunks.push(value);
+    const [submissionError, submission] = await readSubmission(request);
+    if (submissionError !== null) {
+      return reply({ error: submissionError.message }, submissionError.status);
     }
-    const bytes = new Uint8Array(size); let offset = 0;
-    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-    let parsed: unknown;
-    try { parsed = JSON.parse(new TextDecoder().decode(bytes)); } catch { return reply({ error: 'Invalid message.' }, 400); }
-    if (!parsed || typeof parsed !== 'object') return reply({ error: 'Invalid message.' }, 400);
-    const values = parsed as Record<string, unknown>;
-    if (Object.keys(values).some(key => !['subject', 'conversation', 'operation', 'text', 'practice', 'assessmentRevision'].includes(key)) || !uuid(values.subject) || !uuid(values.conversation) || !uuid(values.operation) || typeof values.text !== 'string' || !values.text.trim()) return reply({ error: 'Invalid message.' }, 400);
-    if ('practice' in values && typeof values.practice !== 'boolean') return reply({ error: 'Invalid practice selection.' }, 400);
-    if ('assessmentRevision' in values && (!Number.isSafeInteger(values.assessmentRevision) || (values.assessmentRevision as number) < 0)) return reply({ error: 'Invalid assessment revision.' }, 400);
-    const input = { subject: values.subject, conversation: values.conversation, operation: values.operation, text: values.text, practice: values.practice === true, assessmentRevision: values.assessmentRevision as number | undefined };
-    if (new TextEncoder().encode(input.text).length > 8000) return reply({ error: 'Message too large (8,000 UTF-8 bytes maximum).' }, 413);
+    const input = submission;
     const client = await authClient();
     const saved = await client.rpc('send_conversation_message', { p_subject: input.subject, p_conversation: input.conversation, p_operation: input.operation, p_text: input.text, p_practice: input.practice, p_assessment_revision: input.assessmentRevision ?? null });
     if (saved.error) {

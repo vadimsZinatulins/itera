@@ -2,6 +2,11 @@ import 'server-only';
 import { createClient } from '@supabase/supabase-js';
 import { currentAccount } from '@/lib/auth/server';
 import { authConfig } from '@/lib/auth/config';
+import { unstable_rethrow } from 'next/navigation';
+import type { Result } from '@/lib/types/result';
+import { credentialErrorMessageSchema } from './settings/helpers/credential-validation';
+import { reportCredentialMutationFailure } from './settings/helpers/credential-failures';
+import type { CredentialModel, CredentialMutationError } from './settings/types/credentials';
 
 // Explicit, pinned catalogue: never substitute or silently follow a moving alias.
 export const catalogue = [
@@ -30,11 +35,6 @@ async function read(owner: string): Promise<Credential | null> {
   if (error) throw new SettingsError('Could not read AI settings. Try again.');
   return data?.[0] ?? null;
 }
-async function write(owner: string, key: string, model: string | null) {
-  const { error } = await credentialClient().rpc('server_openai_write', { owner_id: owner, secret: key, selected_model: model });
-  if (error) throw new SettingsError('Could not save AI settings. Try again.');
-}
-
 async function provider(key: string, path: string, body?: object) {
   let response: Response;
   try {
@@ -63,43 +63,33 @@ async function available(key: string) {
   return catalogue.filter(model => ids.has(model.id));
 }
 
-export async function settingsStatus() {
-  const account = await authorised();
-  const saved = await read(account.id);
-  // No network call on page load; saved content stays readable during provider outages.
-  return { hasKey: Boolean(saved), model: saved?.model ?? null };
-}
 export async function refreshModels() {
   const account = await authorised();
   const saved = await read(account.id);
   if (!saved) throw new SettingsError('Save an OpenAI key first.', 422);
   return { models: await available(saved.api_key) };
 }
-export async function saveSettings(input: unknown) {
-  const account = await authorised();
-  if (!input || typeof input !== 'object') throw new SettingsError('Enter a key or select a model.', 400);
-  const values = input as Record<string, unknown>;
-  if (Object.keys(values).some(key => key !== 'key' && key !== 'model')) throw new SettingsError('Unsupported settings field.', 400);
-  const saved = await read(account.id);
-  let key = saved?.api_key;
-  if ('key' in values) {
-    if (typeof values.key !== 'string' || !/^sk-[A-Za-z0-9_-]{8,500}$/.test(values.key)) throw new SettingsError('Enter an OpenAI API key beginning with sk-.', 400);
-    key = values.key;
+// Adapt only the legacy model-access integration used by credential writes.
+// Discovery/check/generation retain their existing behavior until their own slices.
+export async function credentialModels(key: string): Promise<Result<CredentialModel[], CredentialMutationError>> {
+  try {
+    return [null, await available(key)];
+  } catch (error) {
+    unstable_rethrow(error);
+    if (error instanceof SettingsError) {
+      const message = credentialErrorMessageSchema.safeParse(error.message);
+      if (message.success) {
+        if (error.status === 400 || error.status === 422) {
+          return [{ code: 'correction', status: error.status, message: message.data }, null];
+        }
+        if (error.status === 429 || error.status === 502 || error.status === 503) {
+          return [{ code: 'retry', status: error.status, message: message.data }, null];
+        }
+      }
+    }
+    reportCredentialMutationFailure('provider', 'unexpected');
+    return [{ code: 'retry', status: 503, message: 'AI settings are temporarily unavailable. Try again.' }, null];
   }
-  if (!key) throw new SettingsError('Save an OpenAI key first.', 422);
-  const models = await available(key);
-  const model = 'model' in values ? values.model : saved?.model ?? null;
-  if (model !== null && (typeof model !== 'string' || !models.some(item => item.id === model))) {
-    throw new SettingsError('That model is not supported or is unavailable to this key. Refresh models and choose explicitly.', 422);
-  }
-  await write(account.id, key, model);
-  return { hasKey: true, model, models };
-}
-export async function removeSettings() {
-  const account = await authorised();
-  const { error } = await credentialClient().rpc('server_openai_remove', { owner_id: account.id });
-  if (error) throw new SettingsError('Could not remove the key. Try again.');
-  return { hasKey: false, model: null, models: [] };
 }
 
 // Stream only explicitly supplied conversation context; credentials never leave this module.

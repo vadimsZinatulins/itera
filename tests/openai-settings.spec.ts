@@ -60,6 +60,94 @@ test('write-only settings persist, filter access, explicitly test models, replac
   } finally { await admin().auth.admin.deleteUser(account.id); }
 });
 
+test('malformed stored settings status fails safely and can be retried without a provider request', async ({ page, request }) => {
+  const account = await provisionAccount();
+  const key = 'sk-synthetic-status-private-key';
+  try {
+    await request.post(`${control()}/control/openai/reset`);
+    await browserSignIn(page, account.email);
+    expect((await page.request.put(endpoint, { headers: origin(), data: { key, model: models[0] } })).ok()).toBe(true);
+    const before = await (await request.get(`${control()}/control/openai/calls`)).json();
+    await request.delete(`${control()}/control/settings-read-reports`);
+    const malformed = ['malformed-model', 'null', 'object', 'null-row', 'missing-key', 'missing-model', 'duplicate'];
+    for (const mode of malformed) {
+      await request.post(`${control()}/control/settings-read/${mode}`);
+      const status = await page.request.get(endpoint);
+      expect(status.status(), mode).toBe(503);
+      expect(status.headers()['cache-control']).toBe('no-store');
+      expect(await status.json()).toEqual({ error: 'Could not read AI settings. Try again.' });
+    }
+    await page.goto('/settings');
+    await expect(page.getByRole('heading', { name: 'Account service unavailable' })).toBeVisible();
+    expect(await page.content()).not.toContain(key);
+    expect(await page.content()).not.toContain('unsafe');
+    await expect.poll(async () => (await (await request.get(`${control()}/control/settings-read-reports`)).json()).length).toBeGreaterThanOrEqual(malformed.length + 1);
+    const reports: string[] = await (await request.get(`${control()}/control/settings-read-reports`)).json();
+    for (const report of reports) {
+      expect(report).toBe("AI settings read failed. { stage: 'persistence', kind: 'invalid-response' }");
+    }
+    await request.post(`${control()}/control/settings-read/extra-fields`);
+    await page.reload();
+    await expect(page.getByRole('status').first()).toContainText(models[0]);
+    expect(await (await page.request.get(endpoint)).json()).toEqual({ hasKey: true, model: models[0] });
+    expect(await page.content()).not.toContain(key);
+    expect(await page.content()).not.toContain('unsafe');
+    expect(await (await request.get(`${control()}/control/openai/calls`)).json()).toEqual(before);
+  } finally {
+    await request.post(`${control()}/control/settings-read/valid`);
+    await admin().auth.admin.deleteUser(account.id);
+  }
+});
+
+test('settings persistence failures report only safe metadata and allow explicit retry', async ({ page, request }) => {
+  const account = await provisionAccount();
+  try {
+    await browserSignIn(page, account.email);
+    await request.delete(`${control()}/control/settings-read-reports`);
+    await request.post(`${control()}/control/settings-read/unavailable`);
+    const status = await page.request.get(endpoint);
+    expect(status.status()).toBe(503);
+    expect(status.headers()['cache-control']).toBe('no-store');
+    expect(await status.json()).toEqual({ error: 'Could not read AI settings. Try again.' });
+    await expect.poll(async () => (await (await request.get(`${control()}/control/settings-read-reports`)).json())).toEqual([
+      "AI settings read failed. { stage: 'persistence', kind: 'integration-failure' }",
+    ]);
+    await request.post(`${control()}/control/settings-read/valid`);
+    expect(await (await page.request.get(endpoint)).json()).toEqual({ hasKey: false, model: null });
+  } finally {
+    await request.post(`${control()}/control/settings-read/valid`);
+    await admin().auth.admin.deleteUser(account.id);
+  }
+});
+
+test('settings read outages preserve local work and recover without contacting OpenAI', async ({ page, request }) => {
+  const account = await provisionAccount();
+  try {
+    await request.post(`${control()}/control/openai/reset`);
+    await browserSignIn(page, account.email);
+    await page.evaluate(() => localStorage.setItem('learning-companion:unsent', 'synthetic local settings work'));
+    for (const service of ['data', 'auth']) {
+      await request.post(`${control()}/control/${service}/off`);
+      const status = await page.request.get(endpoint);
+      expect(status.status()).toBe(503);
+      expect(status.headers()['cache-control']).toBe('no-store');
+      expect(await status.json()).toEqual({ error: 'AI settings are temporarily unavailable. Try again.' });
+      await page.goto('/settings');
+      await expect(page.getByRole('heading', { name: 'Account service unavailable' })).toBeVisible();
+      expect(await page.evaluate(() => localStorage.getItem('learning-companion:unsent'))).toBe('synthetic local settings work');
+      await request.post(`${control()}/control/${service}/on`);
+      await page.getByRole('link', { name: 'Try again', exact: true }).click();
+      await expect(page.getByRole('status').first()).toContainText('No OpenAI key saved.');
+      expect(await (await page.request.get(endpoint)).json()).toEqual({ hasKey: false, model: null });
+    }
+    expect(await (await request.get(`${control()}/control/openai/calls`)).json()).toEqual([]);
+  } finally {
+    await request.post(`${control()}/control/data/on`);
+    await request.post(`${control()}/control/auth/on`);
+    await admin().auth.admin.deleteUser(account.id);
+  }
+});
+
 test('anonymous, foreign-account and direct public data access cannot read or mutate credentials', async ({ page, request, browser }) => {
   const owner = await provisionAccount();
   const foreign = await provisionAccount();

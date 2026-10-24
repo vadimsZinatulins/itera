@@ -1,6 +1,15 @@
 // Loaded only by the Docker test harness, never by deployed application code.
 // Substitute exactly the outgoing OpenAI boundary; production has no custom endpoint option.
 const originalFetch = globalThis.fetch;
+const originalConsoleError = console.error;
+const { format } = process.getBuiltinModule('node:util');
+// Observe the real stderr boundary in synthetic tests; never shipped in production.
+console.error = (...args) => {
+  originalConsoleError(...args);
+  void originalFetch('http://upstream.test:8080/control/settings-read-reports', {
+    method: 'POST', body: format(...args),
+  }).catch(() => { /* Missing observations fail the public test's polling assertion. */ });
+};
 const realNow = Date.now.bind(Date);
 let clockOffset = 0;
 Date.now = () => realNow() + clockOffset;

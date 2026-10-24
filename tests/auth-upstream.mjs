@@ -7,12 +7,53 @@ const snapshots = ['gpt-5.5-2026-04-23', 'gpt-5.4-mini-2026-03-17'];
 let responseMode = 'completed';
 let calls = [];
 let clockOffset = 0;
+let settingsReadMode = 'valid';
+let documentsReadMode = 'valid';
+let recapsReadMode = 'valid';
+let conversationsReadMode = 'valid';
+let settingsReadReports = [];
 http.createServer((request, response) => {
   const path = new URL(request.url, 'http://test.invalid').pathname;
   const control = path.match(/^\/control\/(auth|data)\/(off|on)$/);
   if (control && request.method === 'POST') {
     if (control[2] === 'off') unavailable.add(control[1]);
     else unavailable.delete(control[1]);
+    response.writeHead(204).end();
+    return;
+  }
+  if (path === '/control/settings-read-reports') {
+    if (request.method === 'POST') {
+      let raw = '';
+      request.on('data', chunk => { raw += chunk; });
+      request.on('end', () => {
+        settingsReadReports.push(raw);
+        response.writeHead(204).end();
+      });
+    } else if (request.method === 'DELETE') {
+      settingsReadReports = [];
+      response.writeHead(204).end();
+    } else {
+      response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(settingsReadReports));
+    }
+    return;
+  }
+  if (path.startsWith('/control/conversations-read/') && request.method === 'POST') {
+    conversationsReadMode = path.split('/').at(-1);
+    response.writeHead(204).end();
+    return;
+  }
+  if (path.startsWith('/control/recaps-read/') && request.method === 'POST') {
+    recapsReadMode = path.split('/').at(-1);
+    response.writeHead(204).end();
+    return;
+  }
+  if (path.startsWith('/control/documents-read/') && request.method === 'POST') {
+    documentsReadMode = path.split('/').at(-1);
+    response.writeHead(204).end();
+    return;
+  }
+  if (path.startsWith('/control/settings-read/') && request.method === 'POST') {
+    settingsReadMode = path.split('/').at(-1);
     response.writeHead(204).end();
     return;
   }
@@ -109,6 +150,88 @@ http.createServer((request, response) => {
     hostname: target.hostname, port: target.port, path: request.url,
     method: request.method, headers: { ...request.headers, host: target.host },
   }, incoming => {
+    if (path === '/rest/v1/rpc/server_openai_read' && settingsReadMode !== 'valid' && incoming.statusCode === 200) {
+      // Corrupt only the external response, after real authentication/persistence.
+      let raw = '';
+      incoming.on('data', chunk => { raw += chunk; });
+      incoming.on('end', () => {
+        const rows = JSON.parse(raw);
+        const privateFields = { diagnostic: 'unsafe synthetic private diagnostic', api_key: 'sk-synthetic-status-private-key' };
+        if (settingsReadMode === 'unavailable') {
+          response.writeHead(503, { 'Content-Type': 'application/json' }).end(JSON.stringify({ message: `${privateFields.diagnostic}: ${privateFields.api_key}` }));
+          return;
+        }
+        const variants = {
+          'malformed-model': rows.map(row => ({ ...row, ...privateFields, model: 42 })),
+          'null': null,
+          'object': { ...privateFields, model: snapshots[0] },
+          'null-row': [null],
+          'missing-key': [{ model: snapshots[0], diagnostic: privateFields.diagnostic }],
+          'missing-model': [{ ...privateFields }],
+          'duplicate': [...rows, ...rows],
+          'extra-fields': rows.map(row => ({ ...row, diagnostic: privateFields.diagnostic })),
+        };
+        response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(variants[settingsReadMode]));
+      });
+      return;
+    }
+    if (path === '/rest/v1/learning_documents' && request.method === 'GET' && documentsReadMode !== 'valid' && incoming.statusCode === 200) {
+      // Fault only the successful real read, preserving authentication and RLS.
+      let raw = '';
+      incoming.on('data', chunk => { raw += chunk; });
+      incoming.on('end', () => {
+        const rows = JSON.parse(raw);
+        const documents = rows.map(row => ({
+          ...row,
+          diagnostic: 'unsafe synthetic document diagnostic',
+          ...(documentsReadMode === 'malformed-blocks'
+            ? { blocks: [{ id: 'first', markdown: 42 }] }
+            : { practice_version: { revision: 1, title: 'Private practice', description: '', blocks: null } }),
+        }));
+        response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(documents));
+      });
+      return;
+    }
+    const recapRead = path === '/rest/v1/practice_recaps';
+    const observationRead = path === '/rest/v1/reviewed_observations';
+    if (request.method === 'GET' && incoming.statusCode === 200 && recapsReadMode !== 'valid' && (recapRead || observationRead)) {
+      // Corrupt only successful real reads after authentication, RLS and persistence; never RPCs/writes.
+      let raw = '';
+      incoming.on('data', chunk => { raw += chunk; });
+      incoming.on('end', () => {
+        const rows = JSON.parse(raw);
+        const diagnostic = 'unsafe synthetic private recap diagnostic';
+        if (recapsReadMode === 'unavailable') {
+          response.writeHead(503, { 'Content-Type': 'application/json' }).end(JSON.stringify({ message: diagnostic }));
+          return;
+        }
+        const variants = {
+          'malformed-proposal': recapRead ? rows.map(row => ({ ...row, proposal: { ...row.proposal, text: 42 }, diagnostic })) : rows,
+          'malformed-observation': observationRead ? rows.map(row => ({ ...row, observation: { ...row.observation, text: 42 }, diagnostic })) : rows,
+          'malformed-sources': observationRead ? rows.map(row => ({ ...row, sources: { diagnostic } })) : rows,
+        };
+        response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(variants[recapsReadMode] ?? rows));
+      });
+      return;
+    }
+    const selectedColumns = new URL(request.url, 'http://test.invalid').searchParams.get('select');
+    const trailRead = path === '/rest/v1/conversations' && selectedColumns === 'id,title,created_at';
+    const turnsRead = path === '/rest/v1/conversation_turns' && selectedColumns === 'id,ordinal,user_text,assistant_text,status,pending_until,practice,sources,assessment';
+    if (request.method === 'GET' && incoming.statusCode === 200 && conversationsReadMode !== 'valid' && (trailRead || turnsRead)) {
+      // Fault only the full history/list read after real authentication, RLS and persistence.
+      let raw = '';
+      incoming.on('data', chunk => { raw += chunk; });
+      incoming.on('end', () => {
+        const rows = JSON.parse(raw);
+        const variants = {
+          'malformed-trail': trailRead ? rows.map(row => ({ ...row, title: 42, diagnostic: 'unsafe synthetic private conversation diagnostic' })) : rows,
+          'malformed-sources': turnsRead ? rows.map(row => ({ ...row, sources: [{ id: row.id, revision: '1', title: 'Private source' }] })) : rows,
+          'malformed-assessment': turnsRead ? rows.map(row => ({ ...row, assessment: { revision: 1, topic: 'Private topic', current_question: null } })) : rows,
+        };
+        response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(variants[conversationsReadMode] ?? rows));
+      });
+      return;
+    }
     response.writeHead(incoming.statusCode, incoming.headers);
     incoming.pipe(response);
   });
