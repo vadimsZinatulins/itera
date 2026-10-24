@@ -6,9 +6,9 @@ import { assessmentInstructions, assessmentRequested, readAssessmentOutput } fro
 import type { Assessment } from '@/lib/assessment';
 import { readConversations } from '@/lib/conversations/actions/read-conversations';
 import { conversationReadErrorResponse } from '@/lib/conversations/helpers/failures';
+import { readSubmission } from '@/lib/conversations/actions/read-submission';
 
 export const maxDuration = 90;
-const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 
 export async function GET(request: Request) {
@@ -25,28 +25,11 @@ export async function POST(request: Request) {
   try {
     const account = await currentAccount();
     if (!account) return reply({ error: 'Sign in required.' }, 401);
-    // Read a bounded body, including clients without Content-Length.
-    const reader = request.body?.getReader();
-    if (!reader) return reply({ error: 'Message required.' }, 400);
-    const chunks: Uint8Array[] = []; let size = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > 12000) { await reader.cancel(); return reply({ error: 'Message too large (8,000 UTF-8 bytes maximum).' }, 413); }
-      chunks.push(value);
+    const [submissionError, submission] = await readSubmission(request);
+    if (submissionError !== null) {
+      return reply({ error: submissionError.message }, submissionError.status);
     }
-    const bytes = new Uint8Array(size); let offset = 0;
-    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-    let parsed: unknown;
-    try { parsed = JSON.parse(new TextDecoder().decode(bytes)); } catch { return reply({ error: 'Invalid message.' }, 400); }
-    if (!parsed || typeof parsed !== 'object') return reply({ error: 'Invalid message.' }, 400);
-    const values = parsed as Record<string, unknown>;
-    if (Object.keys(values).some(key => !['subject', 'conversation', 'operation', 'text', 'practice', 'assessmentRevision'].includes(key)) || !uuid(values.subject) || !uuid(values.conversation) || !uuid(values.operation) || typeof values.text !== 'string' || !values.text.trim()) return reply({ error: 'Invalid message.' }, 400);
-    if ('practice' in values && typeof values.practice !== 'boolean') return reply({ error: 'Invalid practice selection.' }, 400);
-    if ('assessmentRevision' in values && (!Number.isSafeInteger(values.assessmentRevision) || (values.assessmentRevision as number) < 0)) return reply({ error: 'Invalid assessment revision.' }, 400);
-    const input = { subject: values.subject, conversation: values.conversation, operation: values.operation, text: values.text, practice: values.practice === true, assessmentRevision: values.assessmentRevision as number | undefined };
-    if (new TextEncoder().encode(input.text).length > 8000) return reply({ error: 'Message too large (8,000 UTF-8 bytes maximum).' }, 413);
+    const input = submission;
     const client = await authClient();
     const saved = await client.rpc('send_conversation_message', { p_subject: input.subject, p_conversation: input.conversation, p_operation: input.operation, p_text: input.text, p_practice: input.practice, p_assessment_revision: input.assessmentRevision ?? null });
     if (saved.error) {

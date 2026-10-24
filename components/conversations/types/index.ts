@@ -6,6 +6,7 @@ export type ConversationsProps = { accountId: string; subjectId: string; initial
 export type Thread = Pick<ConversationTrail[number], 'id' | 'title'>;
 export type Turn = ConversationHistory[number];
 export type ReadStatus = 'loading' | 'ready' | 'unavailable';
+export type SendError = { code: 'correction' | 'retry'; message: string };
 export type BrowserReadError = { code: 'retry' | 'unavailable'; message: string };
 export type TrailReadResult = Result<ConversationTrail, BrowserReadError>;
 export type RecoveryDeletedDetail = { account: string; subject?: string; conversation?: string };
