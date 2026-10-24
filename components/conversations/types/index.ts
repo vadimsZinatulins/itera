@@ -1,7 +1,11 @@
-import type { Assessment } from '@/lib/assessment';
+import type { ConversationHistory, ConversationTrail } from '@/lib/conversations/types';
+import type { Result } from '@/lib/types/result';
 
 export type ConversationsProps = { accountId: string; subjectId: string; initialConversation?: string };
-export type Thread = { id: string; title: string };
-export type Source = { id: string; title: string; revision: number };
-export type Turn = { assessment?: Assessment | null; practice?: boolean; sources?: Source[]; id: string; ordinal: number; user_text: string; assistant_text: string; status: 'complete' | 'incomplete'; pending_until: string };
+// Stream-local entries intentionally omit fields only available after persistence reads.
+export type Thread = Pick<ConversationTrail[number], 'id' | 'title'>;
+export type Turn = ConversationHistory[number];
 export type ReadStatus = 'loading' | 'ready' | 'unavailable';
+export type BrowserReadError = { code: 'retry' | 'unavailable'; message: string };
+export type TrailReadResult = Result<ConversationTrail, BrowserReadError>;
+export type RecoveryDeletedDetail = { account: string; subject?: string; conversation?: string };

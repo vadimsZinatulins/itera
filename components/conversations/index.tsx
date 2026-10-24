@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { History, MessageCircle, Plus, Send } from 'lucide-react';
+import { History, MessageCircle, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { documentId as operationId } from '@/lib/document-id';
@@ -9,8 +9,10 @@ import { readChatRecovery, saveChatRecovery, type ChatOperation as Operation } f
 import styles from './conversations.module.css';
 import PracticeRecaps from '@/components/practice-recaps';
 import AssessmentBudgetStatus from '@/components/assessment-budget';
-import { readTrail } from './actions/read-history';
-import type { ConversationsProps, ReadStatus, Thread, Turn } from './types';
+import { readHistory, readTrail } from './actions/read-history';
+import ConversationThreads from './components/conversation-threads';
+import TranscriptTurn from './components/transcript-turn';
+import type { ConversationsProps, ReadStatus, RecoveryDeletedDetail, Thread, TrailReadResult, Turn } from './types';
 
 export default function Conversations({ accountId, subjectId, initialConversation }: ConversationsProps) {
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -20,7 +22,8 @@ export default function Conversations({ accountId, subjectId, initialConversatio
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [practice, setPractice] = useState(false);
-  const [loading, setLoading] = useState(Boolean(initialConversation));
+  const [historyStatus, setHistoryStatus] = useState<ReadStatus>(initialConversation ? 'loading' : 'ready');
+  const loading = historyStatus === 'loading';
   const [notice, setNotice] = useState('');
   const [mobile, setMobile] = useState<'threads' | 'chat'>('chat');
   const [retry, setRetry] = useState<Operation | null>(null);
@@ -32,37 +35,74 @@ export default function Conversations({ accountId, subjectId, initialConversatio
   const assessment = turns.filter(turn => turn.assessment).at(-1)?.assessment ?? null;
 
   function prepareAssessment(text: string) {
-    if (busy || loading || retry || draft.trim()) return;
-    setPractice(true); setDraft(text); retain(text, true, null);
+    if (busy || loading || retry || draft.trim()) {
+      return;
+    }
+    setPractice(true);
+    setDraft(text);
+    retain(text, true, null);
     setNotice('Assessment request prepared. Edit topic, difficulty or available time, then Send message.');
   }
   function retain(text: string, mode: boolean, operation: Operation | null, scope = selected) {
-    if (active.current) setLocalSaved(saveChatRecovery(accountId, subjectId, scope, { text, practice: mode, operation }));
+    if (active.current) {
+      setLocalSaved(saveChatRecovery(accountId, subjectId, scope, { text, practice: mode, operation }));
+    }
   }
   function restore(scope: string) {
     const recovered = readChatRecovery(accountId, subjectId, scope);
-    setDraft(recovered?.text ?? ''); setRetry(recovered?.operation ?? null);
-    setPractice(recovered?.practice ?? false); setLocalSaved(Boolean(recovered));
-    if (recovered?.operation) setNotice('Send unconfirmed. Check the same send explicitly; it may already be saved. No automatic retry was made.');
+    setDraft(recovered?.text ?? '');
+    setRetry(recovered?.operation ?? null);
+    setPractice(recovered?.practice ?? false);
+    setLocalSaved(Boolean(recovered));
+    if (recovered?.operation) {
+      setNotice('Send unconfirmed. Check the same send explicitly; it may already be saved. No automatic retry was made.');
+    }
   }
   useEffect(() => {
     active.current = true;
     // Read browser storage after hydration, never during the server render.
     const hydration = window.setTimeout(() => restore(initialConversation ?? ''), 0);
-    const clear = () => { active.current = false; window.clearTimeout(hydration); abort.current?.abort(); setBusy(true); setDraft(''); setRetry(null); setTurns([]); setThreads([]); setPractice(false); setNotice(''); };
+    const clear = () => {
+      active.current = false;
+      window.clearTimeout(hydration);
+      abort.current?.abort();
+      setBusy(true);
+      setDraft('');
+      setRetry(null);
+      setTurns([]);
+      setThreads([]);
+      setPractice(false);
+      setNotice('');
+    };
     window.addEventListener('account-state-cleared', clear);
-    return () => { active.current = false; window.clearTimeout(hydration); window.removeEventListener('account-state-cleared', clear); };
+    return () => {
+      active.current = false;
+      window.clearTimeout(hydration);
+      window.removeEventListener('account-state-cleared', clear);
+    };
     // The parent keys this component by account and Subject; thread changes restore in choose().
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId, subjectId]);
 
   useEffect(() => {
     const deleted = (event: Event) => {
-      const scope = (event as CustomEvent<{ account: string; subject?: string; conversation?: string }>).detail;
-      if (scope.account !== accountId || (scope.subject && scope.subject !== subjectId)) return;
-      if (scope.conversation && scope.conversation !== selected && scope.conversation !== retry?.conversation) return;
-      abort.current?.abort(); setBusy(false); setLoading(false); setDraft(''); setRetry(null); setTurns([]); setSelected(''); setLocalSaved(false);
-      setNotice('Deleted scope cleared from this device.'); url('');
+      const scope = (event as CustomEvent<RecoveryDeletedDetail>).detail;
+      if (scope.account !== accountId || (scope.subject && scope.subject !== subjectId)) {
+        return;
+      }
+      if (scope.conversation && scope.conversation !== selected && scope.conversation !== retry?.conversation) {
+        return;
+      }
+      abort.current?.abort();
+      setBusy(false);
+      setHistoryStatus('ready');
+      setDraft('');
+      setRetry(null);
+      setTurns([]);
+      setSelected('');
+      setLocalSaved(false);
+      setNotice('Deleted scope cleared from this device.');
+      url('');
     };
     window.addEventListener('chat-recovery-deleted', deleted);
     return () => window.removeEventListener('chat-recovery-deleted', deleted);
@@ -70,11 +110,14 @@ export default function Conversations({ accountId, subjectId, initialConversatio
 
   function url(id: string) {
     const next = new URL(window.location.href);
-    if (id) next.searchParams.set('conversation', id); else next.searchParams.delete('conversation');
+    if (id) {
+      next.searchParams.set('conversation', id);
+    } else {
+      next.searchParams.delete('conversation');
+    }
     window.history.replaceState(null, '', next);
   }
-  async function trail(signal?: AbortSignal) {
-    const [error, data] = await readTrail(subjectId, signal);
+  function displayTrail([error, data]: TrailReadResult, signal?: AbortSignal, successNotice?: string) {
     if (!active.current || signal?.aborted) {
       return;
     }
@@ -85,87 +128,150 @@ export default function Conversations({ accountId, subjectId, initialConversatio
     }
     setThreads(data);
     setTrailStatus('ready');
+    if (successNotice) {
+      setNotice(successNotice);
+    }
   }
   useEffect(() => {
     const controller = new AbortController();
-    void trail(controller.signal);
-    return () => { controller.abort(); abort.current?.abort(); };
-    // The parent keys the component by Subject; trail uses that mounted scope.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void readTrail(subjectId, controller.signal).then(result => displayTrail(result, controller.signal));
+    return () => {
+      controller.abort();
+      abort.current?.abort();
+    };
   }, [subjectId]);
   useEffect(() => {
-    if (!selected) return;
+    if (!selected) {
+      return;
+    }
     const controller = new AbortController();
     void (async () => {
-      try {
-        const response = await fetch(`/api/conversations?subject=${subjectId}&conversation=${selected}`, { cache: 'no-store', signal: controller.signal });
-        if (!response.ok) {
-          if (response.status === 404 && !controller.signal.aborted) {
-            saveChatRecovery(accountId, subjectId, selected, null); setDraft(''); setRetry(null); setLocalSaved(false);
-          }
-          throw new Error('Conversation unavailable. Choose another thread or reload.');
+      const [error, data] = await readHistory(subjectId, selected, controller.signal);
+      if (!active.current || controller.signal.aborted) {
+        return;
+      }
+      if (error !== null) {
+        if (error.code === 'unavailable') {
+          saveChatRecovery(accountId, subjectId, selected, null);
+          setDraft('');
+          setRetry(null);
+          setLocalSaved(false);
         }
-        const data = await response.json();
-        if (active.current && !controller.signal.aborted) {
-          setTurns(data);
-          setPractice(readChatRecovery(accountId, subjectId, selected)?.practice ?? data.at(-1)?.practice ?? false);
-        }
-      } catch { if (!controller.signal.aborted) setNotice('Conversation unavailable. Choose another thread or reload.'); }
-      finally { if (!controller.signal.aborted) setLoading(false); }
+        setHistoryStatus('unavailable');
+        setNotice(error.message);
+        return;
+      }
+      setTurns(data);
+      setPractice(readChatRecovery(accountId, subjectId, selected)?.practice ?? data.at(-1)?.practice ?? false);
+      setHistoryStatus('ready');
     })();
     return () => controller.abort();
   }, [selected, subjectId, accountId]);
   useEffect(() => { transcript.current?.scrollTo({ top: transcript.current.scrollHeight }); }, [turns]);
 
   function choose(id: string) {
-    if (busy) return;
-    if (id && id === selected) { setMobile('chat'); return; }
-    setLoading(Boolean(id)); setSelected(id); setTurns([]); setNotice(''); restore(id); setMobile('chat'); url(id);
+    if (busy) {
+      return;
+    }
+    if (id && id === selected) {
+      setMobile('chat');
+      return;
+    }
+    setHistoryStatus(id ? 'loading' : 'ready');
+    setSelected(id);
+    setTurns([]);
+    setNotice('');
+    restore(id);
+    setMobile('chat');
+    url(id);
   }
   async function send() {
-    if (busy || loading || (!retry && !draft.trim())) return;
+    if (busy || loading || (!retry && !draft.trim())) {
+      return;
+    }
     const operation = retry ?? { subject: subjectId, conversation: selected || operationId(), operation: operationId(), text: draft, practice, ...(assessment ? { assessmentRevision: assessment.revision } : {}) };
-    if (retry && !window.confirm('Check this same send? If it was saved, no generation is replayed. If it was not saved, this explicitly starts a request that may incur charges. Provider billing deduplication is not guaranteed.')) return;
+    if (retry && !window.confirm('Check this same send? If it was saved, no generation is replayed. If it was not saved, this explicitly starts a request that may incur charges. Provider billing deduplication is not guaranteed.')) {
+      return;
+    }
     retain(operation.text, operation.practice, operation);
-    setRetry(operation); setBusy(true); setNotice('Sending — not yet confirmed saved.');
-    const controller = new AbortController(); abort.current = controller;
+    setRetry(operation);
+    setBusy(true);
+    setNotice('Sending — not yet confirmed saved.');
+    const controller = new AbortController();
+    abort.current = controller;
     let saved = false;
     try {
       const response = await fetch('/api/conversations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(operation), signal: controller.signal });
-      if (!active.current || controller.signal.aborted) return;
+      if (!active.current || controller.signal.aborted) {
+        return;
+      }
       if (!response.ok) {
         // A definitive rejection did not save this send. Keep text editable;
         // ambiguous transport/server failures retain the exact operation instead.
-        if (response.status >= 400 && response.status < 500) { setRetry(null); retain(operation.text, operation.practice, null); }
-        const result = await response.json(); throw new Error(result.error ?? 'Send failed.');
+        if (response.status >= 400 && response.status < 500) {
+          setRetry(null);
+          retain(operation.text, operation.practice, null);
+        }
+        const result = await response.json();
+        throw new Error(result.error ?? 'Send failed.');
       }
       if (response.headers.get('content-type')?.includes('application/json')) {
         saved = true;
-        retain('', operation.practice, null); setSelected(operation.conversation); url(operation.conversation); setDraft(''); setRetry(null);
-        const history = await fetch(`/api/conversations?subject=${subjectId}&conversation=${operation.conversation}`, { cache: 'no-store', signal: controller.signal });
-        if (!history.ok) throw new Error('Saved message found, but history could not be loaded. Reload to check.');
-        const data = await history.json();
-        if (!active.current || controller.signal.aborted) return;
-        setTurns(data); await trail(controller.signal);
-        if (active.current && !controller.signal.aborted) setNotice('Message already saved. No generation was retried.'); return;
+        retain('', operation.practice, null);
+        setSelected(operation.conversation);
+        url(operation.conversation);
+        setDraft('');
+        setRetry(null);
+        const [historyError, data] = await readHistory(subjectId, operation.conversation, controller.signal);
+        if (!active.current || controller.signal.aborted) {
+          return;
+        }
+        if (historyError !== null) {
+          setHistoryStatus('unavailable');
+          setNotice('Saved message found, but history could not be loaded. Reload to check.');
+          return;
+        }
+        setTurns(data);
+        setHistoryStatus('ready');
+        const trail = await readTrail(subjectId, controller.signal);
+        displayTrail(trail, controller.signal, 'Message already saved. No generation was retried.');
+        return;
       }
-      const reader = response.body!.getReader(); const decoder = new TextDecoder(); let buffer = '', ended = false;
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '', ended = false;
       while (true) {
-        const { done, value } = await reader.read(); if (done) break;
-        if (!active.current || controller.signal.aborted) return;
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        if (!active.current || controller.signal.aborted) {
+          return;
+        }
         buffer += decoder.decode(value, { stream: true });
         let end;
         while ((end = buffer.indexOf('\n')) !== -1) {
-          const event = JSON.parse(buffer.slice(0, end)); buffer = buffer.slice(end + 1);
+          const event = JSON.parse(buffer.slice(0, end));
+          buffer = buffer.slice(end + 1);
           if (event.saved) {
-            saved = true; retain('', operation.practice, null); setDraft(''); setRetry(null); url(operation.conversation);
+            saved = true;
+            retain('', operation.practice, null);
+            setDraft('');
+            setRetry(null);
+            url(operation.conversation);
             setTurns(current => [...current.filter(turn => turn.id !== operation.operation), { id: operation.operation, ordinal: current.length + 1, user_text: operation.text, assistant_text: '', status: 'incomplete', pending_until: '' }]);
             setThreads(current => current.some(thread => thread.id === operation.conversation) ? current : [{ id: operation.conversation, title: operation.text.slice(0, 80) }, ...current]);
             setNotice('Message saved. Reply streaming — not complete yet.');
           }
-          if (event.assessment) setTurns(current => current.map(turn => turn.id === operation.operation ? { ...turn, assessment: event.assessment } : turn));
-          if (event.sources) setTurns(current => current.map(turn => turn.id === operation.operation ? { ...turn, sources: event.sources } : turn));
-          if (event.delta) setTurns(current => current.map(turn => turn.id === operation.operation ? { ...turn, assistant_text: turn.assistant_text + event.delta } : turn));
+          if (event.assessment) {
+            setTurns(current => current.map(turn => turn.id === operation.operation ? { ...turn, assessment: event.assessment } : turn));
+          }
+          if (event.sources) {
+            setTurns(current => current.map(turn => turn.id === operation.operation ? { ...turn, sources: event.sources } : turn));
+          }
+          if (event.delta) {
+            setTurns(current => current.map(turn => turn.id === operation.operation ? { ...turn, assistant_text: turn.assistant_text + event.delta } : turn));
+          }
           if (event.status) {
             ended = true;
             setTurns(current => current.map(turn => turn.id === operation.operation ? { ...turn, status: event.status } : turn));
@@ -173,13 +279,19 @@ export default function Conversations({ accountId, subjectId, initialConversatio
           }
         }
       }
-      if (!ended) setNotice('Reply interrupted — incomplete. Reload to inspect saved output. No automatic generation retry was made.');
+      if (!ended) {
+        setNotice('Reply interrupted — incomplete. Reload to inspect saved output. No automatic generation retry was made.');
+      }
     } catch (error) {
-      if (!controller.signal.aborted) setNotice(saved ? 'Message saved. Reply interrupted — incomplete. Reload to inspect saved output. No automatic generation retry was made.' : `Send failed or unconfirmed. ${error instanceof Error ? error.message : 'Check the same send to avoid duplication.'}`);
+      if (!controller.signal.aborted) {
+        setNotice(saved ? 'Message saved. Reply interrupted — incomplete. Reload to inspect saved output. No automatic generation retry was made.' : `Send failed or unconfirmed. ${error instanceof Error ? error.message : 'Check the same send to avoid duplication.'}`);
+      }
     } finally {
       if (active.current) {
         setBusy(false);
-        if (saved && !controller.signal.aborted) setSelected(operation.conversation);
+        if (saved && !controller.signal.aborted) {
+          setSelected(operation.conversation);
+        }
       }
     }
   }
@@ -191,22 +303,14 @@ export default function Conversations({ accountId, subjectId, initialConversatio
       <Button variant={mobile === 'chat' ? 'secondary' : 'ghost'} aria-pressed={mobile === 'chat'} onClick={() => setMobile('chat')}><MessageCircle />Chat</Button>
     </nav>
     <div className={styles.workspace} data-view={mobile}>
-      <aside className={styles.trail} aria-label="Conversation threads" tabIndex={0} aria-busy={trailStatus === 'loading'}>
-        <Button className="mb-4 min-h-11 w-full" variant="outline" disabled={busy} onClick={() => choose('')}><Plus />A new thread</Button>
-        {trailStatus === 'loading' && <p>Loading your trail…</p>}
-        {trailStatus === 'unavailable' && <p>Could not load your trail. Try reloading.</p>}
-        {trailStatus === 'ready' && !threads.length && <p className="text-sm leading-7 text-muted-foreground">Your first saved message adds a conversation here. Return whenever you like.</p>}
-        {threads.map(thread => <button key={thread.id} disabled={busy} aria-current={selected === thread.id ? 'true' : undefined} className="mb-2 block min-h-11 w-full rounded-lg border p-3 text-left text-sm break-words aria-[current=true]:bg-muted" onClick={() => choose(thread.id)}>{thread.title}</button>)}
-      </aside>
+      <ConversationThreads threads={threads} status={trailStatus} busy={busy} selected={selected} choose={choose} />
       <section className={styles.chat} aria-label="Subject conversation">
         <header className="border-b p-4 text-sm font-medium">{selected ? 'Continue this conversation' : 'What’s on your mind?'}</header>
         <div ref={transcript} className={styles.transcript} aria-label="Conversation messages" tabIndex={0} aria-busy={loading}>
           {loading && <p>Loading saved history…</p>}
-          {!turns.length && !loading && <p className="text-sm text-muted-foreground">Send a message to begin. Leaving does not finish a conversation.</p>}
-          {turns.map(turn => <div key={turn.id} className="space-y-4">
-            <article className="ml-4 rounded-xl bg-muted p-4"><h3 className="mb-1 text-xs font-medium">You · saved</h3><p className="whitespace-pre-wrap break-words text-sm leading-7">{turn.user_text}</p></article>
-            <article className="p-2">{Boolean(turn.sources?.length) && <details className="mb-3 text-sm"><summary className="min-h-11 cursor-pointer">Approved sources selected · {turn.sources!.length}</summary><ul className="break-words">{turn.sources!.map(source => <li key={source.id}>{source.title} · Practice version {source.revision} <span className="break-all text-xs text-muted-foreground">({source.id})</span></li>)}</ul><p className="text-xs text-muted-foreground">Versions selected for this reply, not proof every source was used or an incomplete request reached OpenAI. Later updates do not change this record.</p></details>}<h3 className="mb-1 text-xs font-medium">Companion · {turn.status === 'complete' ? 'complete' : 'incomplete'}</h3><p className="whitespace-pre-wrap break-words text-sm leading-7">{turn.assistant_text.replaceAll('[recap-checkpoint]', '') || 'No completed reply saved.'}</p></article>
-          </div>)}
+          {historyStatus === 'unavailable' && <p>Conversation unavailable. Choose another thread or reload.</p>}
+          {!turns.length && historyStatus === 'ready' && <p className="text-sm text-muted-foreground">Send a message to begin. Leaving does not finish a conversation.</p>}
+          {turns.map(turn => <TranscriptTurn key={turn.id} turn={turn} />)}
           {assessment && <section aria-label="Assessment progress" className="space-y-2 rounded-xl border p-3 text-sm">
             <h3 className="font-medium">Assessment · {assessment.topic}</h3>
             <p>{assessment.opened} questions opened · {assessment.answered} answered · {assessment.skipped} skipped (not assessed)</p>
@@ -234,9 +338,13 @@ export default function Conversations({ accountId, subjectId, initialConversatio
       </section>
     </div>
     {turns.at(-1)?.status === 'incomplete' && !retry && <Button variant="outline" disabled={busy || loading || Boolean(draft.trim())} onClick={() => {
-      if (!window.confirm('Request another reply? The previous request may already have incurred charges. This sends a new message and may incur another charge; provider billing deduplication is not guaranteed.')) return;
+      if (!window.confirm('Request another reply? The previous request may already have incurred charges. This sends a new message and may incur another charge; provider billing deduplication is not guaranteed.')) {
+        return;
+      }
       const text = 'Please try answering my previous message again. The previous reply was incomplete.';
-      setDraft(text); retain(text, practice, null); setNotice('New request prepared. Choose Send message to generate another reply.');
+      setDraft(text);
+      retain(text, practice, null);
+      setNotice('New request prepared. Choose Send message to generate another reply.');
     }}>Request another reply</Button>}
     <p aria-live="polite" aria-label="Conversation status" className="mt-3 text-sm">{notice}</p>
     <p className="mt-3 text-xs leading-6 text-muted-foreground">This conversation and, only with Use approved sources enabled, current approved Practice versions and learner-reviewed provisional observations in this Subject are sent to OpenAI. Requesting a recap sends new conversation activity for a tentative interpretation; review is always explicit. Drafts and Reference notes are excluded. Sources are bounded to 20 documents / 16,000 bytes; oversized context is refused, not silently truncated. Requests use your selected key/model. History is stored in this app with optional provider response storage disabled. This does not eliminate provider retention: abuse-monitoring logs may retain content for up to 30 days, with policy exceptions. API usage may incur charges. Replies are limited to 2,048 output tokens; messages to 8,000 UTF-8 bytes and conversation context to 28,000 bytes. No automatic generation retries.</p>

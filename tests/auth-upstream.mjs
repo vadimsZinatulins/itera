@@ -9,6 +9,7 @@ let calls = [];
 let clockOffset = 0;
 let settingsReadMode = 'valid';
 let documentsReadMode = 'valid';
+let conversationsReadMode = 'valid';
 let settingsReadReports = [];
 http.createServer((request, response) => {
   const path = new URL(request.url, 'http://test.invalid').pathname;
@@ -33,6 +34,11 @@ http.createServer((request, response) => {
     } else {
       response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(settingsReadReports));
     }
+    return;
+  }
+  if (path.startsWith('/control/conversations-read/') && request.method === 'POST') {
+    conversationsReadMode = path.split('/').at(-1);
+    response.writeHead(204).end();
     return;
   }
   if (path.startsWith('/control/documents-read/') && request.method === 'POST') {
@@ -177,6 +183,24 @@ http.createServer((request, response) => {
             : { practice_version: { revision: 1, title: 'Private practice', description: '', blocks: null } }),
         }));
         response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(documents));
+      });
+      return;
+    }
+    const selectedColumns = new URL(request.url, 'http://test.invalid').searchParams.get('select');
+    const trailRead = path === '/rest/v1/conversations' && selectedColumns === 'id,title,created_at';
+    const turnsRead = path === '/rest/v1/conversation_turns' && selectedColumns === 'id,ordinal,user_text,assistant_text,status,pending_until,practice,sources,assessment';
+    if (request.method === 'GET' && incoming.statusCode === 200 && conversationsReadMode !== 'valid' && (trailRead || turnsRead)) {
+      // Fault only the full history/list read after real authentication, RLS and persistence.
+      let raw = '';
+      incoming.on('data', chunk => { raw += chunk; });
+      incoming.on('end', () => {
+        const rows = JSON.parse(raw);
+        const variants = {
+          'malformed-trail': trailRead ? rows.map(row => ({ ...row, title: 42, diagnostic: 'unsafe synthetic private conversation diagnostic' })) : rows,
+          'malformed-sources': turnsRead ? rows.map(row => ({ ...row, sources: [{ id: row.id, revision: '1', title: 'Private source' }] })) : rows,
+          'malformed-assessment': turnsRead ? rows.map(row => ({ ...row, assessment: { revision: 1, topic: 'Private topic', current_question: null } })) : rows,
+        };
+        response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(variants[conversationsReadMode] ?? rows));
       });
       return;
     }
