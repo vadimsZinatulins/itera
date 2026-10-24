@@ -1,11 +1,17 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { composerSchema } from '@/lib/conversations/helpers/submission-validation';
+import type { ComposerFields } from '@/lib/conversations/types/submission';
+import { submitMessage } from './actions/submit-message';
 import { History, MessageCircle, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { documentId as operationId } from '@/lib/document-id';
-import { readChatRecovery, saveChatRecovery, type ChatOperation as Operation } from '@/lib/chat-recovery';
+import { readChatRecovery, saveChatRecovery } from '@/lib/chat-recovery';
+import type { ChatOperation } from '@/lib/chat-recovery/types';
 import styles from './conversations.module.css';
 import PracticeRecaps from '@/components/practice-recaps';
 import AssessmentBudgetStatus from '@/components/assessment-budget';
@@ -19,14 +25,18 @@ export default function Conversations({ accountId, subjectId, initialConversatio
   const [trailStatus, setTrailStatus] = useState<ReadStatus>('loading');
   const [selected, setSelected] = useState(initialConversation ?? '');
   const [turns, setTurns] = useState<Turn[]>([]);
-  const [draft, setDraft] = useState('');
+  const { register, control, getValues, setValue, reset, handleSubmit, formState: { errors } } = useForm<ComposerFields>({
+    resolver: zodResolver(composerSchema),
+    defaultValues: { text: '', practice: false },
+  });
+  const draft = useWatch({ control, name: 'text' });
+  const practice = useWatch({ control, name: 'practice' });
   const [busy, setBusy] = useState(false);
-  const [practice, setPractice] = useState(false);
   const [historyStatus, setHistoryStatus] = useState<ReadStatus>(initialConversation ? 'loading' : 'ready');
   const loading = historyStatus === 'loading';
   const [notice, setNotice] = useState('');
   const [mobile, setMobile] = useState<'threads' | 'chat'>('chat');
-  const [retry, setRetry] = useState<Operation | null>(null);
+  const [retry, setRetry] = useState<ChatOperation | null>(null);
   const transcript = useRef<HTMLDivElement>(null);
   const abort = useRef<AbortController | null>(null);
   const active = useRef(true);
@@ -38,21 +48,28 @@ export default function Conversations({ accountId, subjectId, initialConversatio
     if (busy || loading || retry || draft.trim()) {
       return;
     }
-    setPractice(true);
-    setDraft(text);
+    reset({ text, practice: true });
     retain(text, true, null);
     setNotice('Assessment request prepared. Edit topic, difficulty or available time, then Send message.');
   }
-  function retain(text: string, mode: boolean, operation: Operation | null, scope = selected) {
+  function retain(text: string, mode: boolean, operation: ChatOperation | null, scope = selected) {
     if (active.current) {
-      setLocalSaved(saveChatRecovery(accountId, subjectId, scope, { text, practice: mode, operation }));
+      const [error] = saveChatRecovery(accountId, subjectId, scope, { text, practice: mode, operation });
+      setLocalSaved(error === null);
     }
   }
   function restore(scope: string) {
-    const recovered = readChatRecovery(accountId, subjectId, scope);
-    setDraft(recovered?.text ?? '');
+    const [error, result] = readChatRecovery(accountId, subjectId, scope);
+    if (error !== null) {
+      reset({ text: '', practice: false });
+      setRetry(null);
+      setLocalSaved(false);
+      setNotice(error.message);
+      return;
+    }
+    const recovered = result.status === 'recovered' ? result.recovery : null;
+    reset({ text: recovered?.text ?? '', practice: recovered?.practice ?? false });
     setRetry(recovered?.operation ?? null);
-    setPractice(recovered?.practice ?? false);
     setLocalSaved(Boolean(recovered));
     if (recovered?.operation) {
       setNotice('Send unconfirmed. Check the same send explicitly; it may already be saved. No automatic retry was made.');
@@ -67,11 +84,10 @@ export default function Conversations({ accountId, subjectId, initialConversatio
       window.clearTimeout(hydration);
       abort.current?.abort();
       setBusy(true);
-      setDraft('');
+      reset({ text: '', practice: false });
       setRetry(null);
       setTurns([]);
       setThreads([]);
-      setPractice(false);
       setNotice('');
     };
     window.addEventListener('account-state-cleared', clear);
@@ -96,7 +112,7 @@ export default function Conversations({ accountId, subjectId, initialConversatio
       abort.current?.abort();
       setBusy(false);
       setHistoryStatus('ready');
-      setDraft('');
+      reset({ text: '', practice: false });
       setRetry(null);
       setTurns([]);
       setSelected('');
@@ -106,7 +122,7 @@ export default function Conversations({ accountId, subjectId, initialConversatio
     };
     window.addEventListener('chat-recovery-deleted', deleted);
     return () => window.removeEventListener('chat-recovery-deleted', deleted);
-  }, [accountId, subjectId, selected, retry]);
+  }, [accountId, subjectId, selected, retry, reset]);
 
   function url(id: string) {
     const next = new URL(window.location.href);
@@ -152,8 +168,10 @@ export default function Conversations({ accountId, subjectId, initialConversatio
       }
       if (error !== null) {
         if (error.code === 'unavailable') {
-          saveChatRecovery(accountId, subjectId, selected, null);
-          setDraft('');
+          // History has definitively rejected this scope; discard memory even if storage is unavailable.
+          const [ignoredRecoveryError] = saveChatRecovery(accountId, subjectId, selected, null);
+          void ignoredRecoveryError;
+          setValue('text', '');
           setRetry(null);
           setLocalSaved(false);
         }
@@ -162,11 +180,13 @@ export default function Conversations({ accountId, subjectId, initialConversatio
         return;
       }
       setTurns(data);
-      setPractice(readChatRecovery(accountId, subjectId, selected)?.practice ?? data.at(-1)?.practice ?? false);
+      const [recoveryError, result] = readChatRecovery(accountId, subjectId, selected);
+      const recovered = recoveryError === null && result.status === 'recovered' ? result.recovery : null;
+      setValue('practice', recovered?.practice ?? data.at(-1)?.practice ?? false);
       setHistoryStatus('ready');
     })();
     return () => controller.abort();
-  }, [selected, subjectId, accountId]);
+  }, [selected, subjectId, accountId, setValue]);
   useEffect(() => { transcript.current?.scrollTo({ top: transcript.current.scrollHeight }); }, [turns]);
 
   function choose(id: string) {
@@ -185,11 +205,11 @@ export default function Conversations({ accountId, subjectId, initialConversatio
     setMobile('chat');
     url(id);
   }
-  async function send() {
+  async function send(fields: ComposerFields) {
     if (busy || loading || (!retry && !draft.trim())) {
       return;
     }
-    const operation = retry ?? { subject: subjectId, conversation: selected || operationId(), operation: operationId(), text: draft, practice, ...(assessment ? { assessmentRevision: assessment.revision } : {}) };
+    const operation = retry ?? { subject: subjectId, conversation: selected || operationId(), operation: operationId(), text: fields.text, practice: fields.practice, ...(assessment ? { assessmentRevision: assessment.revision } : {}) };
     if (retry && !window.confirm('Check this same send? If it was saved, no generation is replayed. If it was not saved, this explicitly starts a request that may incur charges. Provider billing deduplication is not guaranteed.')) {
       return;
     }
@@ -201,26 +221,25 @@ export default function Conversations({ accountId, subjectId, initialConversatio
     abort.current = controller;
     let saved = false;
     try {
-      const response = await fetch('/api/conversations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(operation), signal: controller.signal });
+      const [sendError, response] = await submitMessage(operation, controller.signal);
       if (!active.current || controller.signal.aborted) {
         return;
       }
-      if (!response.ok) {
-        // A definitive rejection did not save this send. Keep text editable;
-        // ambiguous transport/server failures retain the exact operation instead.
-        if (response.status >= 400 && response.status < 500) {
+      if (sendError !== null) {
+        // Definitive rejections retain editable text; ambiguous failures retain exact identity.
+        if (sendError.code === 'correction') {
           setRetry(null);
           retain(operation.text, operation.practice, null);
         }
-        const result = await response.json();
-        throw new Error(result.error ?? 'Send failed.');
+        setNotice(`Send failed or unconfirmed. ${sendError.message}`);
+        return;
       }
       if (response.headers.get('content-type')?.includes('application/json')) {
         saved = true;
         retain('', operation.practice, null);
         setSelected(operation.conversation);
         url(operation.conversation);
-        setDraft('');
+        setValue('text', '');
         setRetry(null);
         const [historyError, data] = await readHistory(subjectId, operation.conversation, controller.signal);
         if (!active.current || controller.signal.aborted) {
@@ -256,7 +275,7 @@ export default function Conversations({ accountId, subjectId, initialConversatio
           if (event.saved) {
             saved = true;
             retain('', operation.practice, null);
-            setDraft('');
+            setValue('text', '');
             setRetry(null);
             url(operation.conversation);
             setTurns(current => [...current.filter(turn => turn.id !== operation.operation), { id: operation.operation, ordinal: current.length + 1, user_text: operation.text, assistant_text: '', status: 'incomplete', pending_until: '' }]);
@@ -321,7 +340,9 @@ export default function Conversations({ accountId, subjectId, initialConversatio
           </section>}
           {selected && <PracticeRecaps key={`${accountId}:${subjectId}:${selected}`} subject={subjectId} conversation={selected} activity={`${turns.length}:${turns.at(-1)?.status}`} checkpoint={Boolean(turns.at(-1)?.assistant_text.includes('[recap-checkpoint]'))} disabled={busy || loading} />}
         </div>
-        <form className="shrink-0 border-t p-3" onSubmit={event => { event.preventDefault(); void send(); }}>
+        <form className="shrink-0 border-t p-3" onSubmit={handleSubmit(send, invalid => {
+          setNotice(invalid.text?.message ?? 'Invalid message.');
+        })}>
           <div className="mb-2 flex flex-wrap gap-2">
             <Button type="button" className="min-h-11" variant="outline" disabled={busy || loading || Boolean(retry) || Boolean(draft.trim())} onClick={() => prepareAssessment(assessment ? 'Resume my assessment in this conversation. Keep the current question if it is unanswered.' : 'Start a quick assessment from my approved sources. Ask one question at a time.')}>{assessment ? 'Resume assessment' : 'Quick assessment'}</Button>
             {assessment?.current_question && <>
@@ -330,9 +351,16 @@ export default function Conversations({ accountId, subjectId, initialConversatio
               <Button type="button" className="min-h-11" variant="ghost" disabled={busy || loading || Boolean(retry) || Boolean(draft.trim())} onClick={() => prepareAssessment('Skip the current assessment question; it is not assessed. Continue with another question if appropriate.')}>Skip question</Button>
             </>}
           </div>
-          <label className="mb-3 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={practice} disabled={busy || loading || Boolean(retry)} onChange={event => { setPractice(event.target.checked); retain(draft, event.target.checked, null); }} />Use approved sources for practice, explanations and hints</label>
+          <label className="mb-3 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" {...register('practice', { onChange: () => {
+            const fields = getValues();
+            retain(fields.text, fields.practice, null);
+          } })} disabled={busy || loading || Boolean(retry)} />Use approved sources for practice, explanations and hints</label>
           <label htmlFor="conversation-message" className="sr-only">Your message</label>
-          <Textarea id="conversation-message" className="min-h-20 max-h-36 text-base" value={draft} disabled={busy || Boolean(retry)} onChange={event => { setDraft(event.target.value); retain(event.target.value, practice, null); }} placeholder="Bring a question…" />
+          <Textarea id="conversation-message" className="min-h-20 max-h-36 text-base" {...register('text', { onChange: () => {
+            const fields = getValues();
+            retain(fields.text, fields.practice, null);
+          } })} aria-invalid={Boolean(errors.text)} aria-describedby={errors.text ? 'conversation-message-error' : undefined} disabled={busy || Boolean(retry)} placeholder="Bring a question…" />
+          {errors.text && <p id="conversation-message-error" role="alert" className="text-sm text-destructive">{errors.text.message}</p>}
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{draft || retry ? `${retry ? 'Unconfirmed send' : 'Unsent'} · ${localSaved ? 'Saved on this device' : 'Device recovery unavailable'} · ${retry ? 'server save unconfirmed' : 'not server-saved'} · device recovery does not synchronise` : 'Unsent text is not server-saved'}</span><Button type="submit" className="min-h-11" disabled={busy || loading || (!retry && !draft.trim())}><Send />{busy ? 'Sending…' : retry ? 'Retry same send' : 'Send message'}</Button></div>
         </form>
       </section>
@@ -342,7 +370,7 @@ export default function Conversations({ accountId, subjectId, initialConversatio
         return;
       }
       const text = 'Please try answering my previous message again. The previous reply was incomplete.';
-      setDraft(text);
+      setValue('text', text);
       retain(text, practice, null);
       setNotice('New request prepared. Choose Send message to generate another reply.');
     }}>Request another reply</Button>}
