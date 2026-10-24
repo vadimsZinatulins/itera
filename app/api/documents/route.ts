@@ -1,22 +1,17 @@
 import { authClient, currentAccount } from '@/lib/auth/server';
 import { authConfig } from '@/lib/auth/config';
+import { readDocuments } from '@/lib/documents/actions/read-documents';
+import { documentReadErrorResponse } from '@/lib/documents/helpers/failures';
 
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 const uuid = (value: unknown) => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 
 export async function GET(request: Request) {
-  try {
-    const account = await currentAccount();
-    if (!account) return reply({ error: 'Sign in required.' }, 401);
-    const subjectId = new URL(request.url).searchParams.get('subject');
-    if (!uuid(subjectId)) return reply({ error: 'Subject unavailable.' }, 400);
-    const client = await authClient();
-    const subject = await client.from('subjects').select('id').eq('id', subjectId).eq('account_id', account.id).maybeSingle();
-    if (subject.error) return reply({ error: 'Could not load documents.' }, 503);
-    if (!subject.data) return reply({ error: 'Subject unavailable.' }, 404);
-    const { data, error } = await client.from('learning_documents').select('id,subject_id,revision,title,description,blocks,practice_version').eq('account_id', account.id).eq('subject_id', subjectId).order('updated_at', { ascending: false });
-    return error ? reply({ error: 'Could not load documents.' }, 503) : reply(data);
-  } catch { return reply({ error: 'Could not load documents. Try again.' }, 503); }
+  const [error, documents] = await readDocuments(new URL(request.url).searchParams.get('subject'));
+  if (error !== null) {
+    return documentReadErrorResponse(error);
+  }
+  return reply(documents);
 }
 
 export async function POST(request: Request) {
