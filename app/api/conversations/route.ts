@@ -4,32 +4,20 @@ import { authConfig } from '@/lib/auth/config';
 import { SettingsError, streamConversation } from '@/lib/openai/server';
 import { assessmentInstructions, assessmentRequested, readAssessmentOutput } from '@/lib/assessments/server';
 import type { Assessment } from '@/lib/assessment';
+import { readConversations } from '@/lib/conversations/actions/read-conversations';
+import { conversationReadErrorResponse } from '@/lib/conversations/helpers/failures';
 
 export const maxDuration = 90;
 const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 
 export async function GET(request: Request) {
-  try {
-    const account = await currentAccount();
-    if (!account) return reply({ error: 'Sign in required.' }, 401);
-    const params = new URL(request.url).searchParams;
-    const subject = params.get('subject'), conversation = params.get('conversation');
-    if (!uuid(subject) || (conversation !== null && !uuid(conversation))) return reply({ error: 'Invalid conversation scope.' }, 400);
-    const client = await authClient();
-    const owned = await client.from('subjects').select('id').eq('id', subject).eq('account_id', account.id).maybeSingle();
-    if (owned.error) return reply({ error: 'Could not load trail.' }, 503);
-    if (!owned.data) return reply({ error: 'Subject unavailable.' }, 404);
-    if (!conversation) {
-      const { data, error } = await client.from('conversations').select('id,title,created_at').eq('account_id', account.id).eq('subject_id', subject).order('created_at', { ascending: false });
-      return error ? reply({ error: 'Could not load trail.' }, 503) : reply(data);
-    }
-    const ownedConversation = await client.from('conversations').select('id').eq('id', conversation).eq('subject_id', subject).eq('account_id', account.id).maybeSingle();
-    if (ownedConversation.error) return reply({ error: 'Could not load conversation.' }, 503);
-    if (!ownedConversation.data) return reply({ error: 'Conversation unavailable.' }, 404);
-    const { data, error } = await client.from('conversation_turns').select('id,ordinal,user_text,assistant_text,status,pending_until,practice,sources,assessment').eq('account_id', account.id).eq('conversation_id', conversation).order('ordinal');
-    return error ? reply({ error: 'Could not load conversation.' }, 503) : reply(data);
-  } catch { return reply({ error: 'Could not load conversations. Try again.' }, 503); }
+  const params = new URL(request.url).searchParams;
+  const [error, conversations] = await readConversations(params.get('subject'), params.get('conversation'));
+  if (error !== null) {
+    return conversationReadErrorResponse(error);
+  }
+  return reply(conversations);
 }
 
 export async function POST(request: Request) {
