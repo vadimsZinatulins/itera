@@ -13,7 +13,22 @@ test('public application and data boundaries enforce Subject ownership and name 
     for (const name of ['', '  ', '\t\n', 'x'.repeat(81)]) {
       expect((await page.request.post('/api/subjects', { headers: { origin }, data: { name } })).status()).toBe(400);
     }
-    const created = await page.request.post('/api/subjects', { headers: { origin }, data: { name: '  Biology  ', account_id: second.id } });
+    for (const input of [null, [], ['Biology'], {}, { name: null }, { name: 42 }, { name: ['Biology'] }, { name: {} }, true, 'Biology']) {
+      const response = await page.request.post('/api/subjects', {
+        headers: { origin, 'Content-Type': 'application/json' }, data: JSON.stringify(input),
+      });
+      expect(response.status()).toBe(400);
+      expect(await response.json()).toEqual({ error: 'Enter a Subject name.' });
+      expect(response.headers()['cache-control']).toBe('no-store');
+    }
+    for (const text of ['', '{', '{"name":']) {
+      const response = await page.request.post('/api/subjects', {
+        headers: { origin, 'Content-Type': 'application/json' }, data: text,
+      });
+      expect(response.status()).toBe(400);
+      expect(await response.json()).toEqual({ error: 'Enter a Subject name.' });
+    }
+    const created = await page.request.post('/api/subjects', { headers: { origin }, data: { name: '  Biology  ', account_id: second.id, id: second.id, extra: 'ignored' } });
     expect(created.status()).toBe(201);
     const own = await created.json();
     expect(own.name).toBe('Biology');
