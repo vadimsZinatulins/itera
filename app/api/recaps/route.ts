@@ -2,32 +2,20 @@ import { createClient } from '@supabase/supabase-js';
 import { authClient, currentAccount } from '@/lib/auth/server';
 import { authConfig } from '@/lib/auth/config';
 import { generateText, SettingsError } from '@/lib/openai/server';
+import { readRecaps } from '@/lib/recaps/actions/read-recaps';
+import { recapReadErrorResponse } from '@/lib/recaps/helpers/failures';
 
 export const maxDuration = 60;
 const uuid = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 
 export async function GET(request: Request) {
-  try {
-    const account = await currentAccount();
-    if (!account) return reply({ error: 'Sign in required.' }, 401);
-    const params = new URL(request.url).searchParams;
-    const subject = params.get('subject'), conversation = params.get('conversation');
-    if (!uuid(subject) || !uuid(conversation)) return reply({ error: 'Invalid recap scope.' }, 400);
-    const client = await authClient();
-    const owned = await client.from('conversations').select('id').eq('id', conversation).eq('subject_id', subject).eq('account_id', account.id).maybeSingle();
-    if (owned.error) throw owned.error;
-    if (!owned.data) return reply({ error: 'Conversation unavailable.' }, 404);
-    const [recaps, observations, coverage, documents] = await Promise.all([
-      client.from('practice_recaps').select('*').eq('subject_id', subject).eq('conversation_id', conversation).order('created_at'),
-      client.from('reviewed_observations').select('*').eq('subject_id', subject).order('created_at'),
-      client.from('reviewed_coverage').select('through_ordinal').eq('conversation_id', conversation).maybeSingle(),
-      client.from('learning_documents').select('id').eq('subject_id', subject),
-    ]);
-    if (recaps.error || observations.error || coverage.error || documents.error) throw new Error();
-    const existing = new Set(documents.data.map(d => d.id));
-    return reply({ recaps: recaps.data, observations: observations.data.map(o => ({ ...o, sources: o.sources.map((s: { id: string }) => ({ ...s, deleted: !existing.has(s.id) })) })), through: coverage.data?.through_ordinal ?? 0 });
-  } catch { return reply({ error: 'Could not load reviewed understanding.' }, 503); }
+  const params = new URL(request.url).searchParams;
+  const [error, state] = await readRecaps(params.get('subject'), params.get('conversation'));
+  if (error !== null) {
+    return recapReadErrorResponse(error);
+  }
+  return reply(state);
 }
 
 export async function POST(request: Request) {
