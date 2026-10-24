@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — Read AI settings through validated outcomes.
 
-Status: implemented — Docker gates passed; awaiting independent review and merger
+Status: resolved
 
 - [x] Prefactor recap/observation read ownership before generation and mutation migrations. Place explicit representations, response schemas and helpers with their narrowest owners; retain client-safe contracts.
 - [x] Validate read payloads at relevant boundaries and consume parsed values. Type established persistence invariants without duplicating checks throughout consumers.
@@ -37,4 +37,12 @@ Parent: [conformance spec](../spec.md). No new understanding workspace, map beha
 - Real fixture-only source deletion was explicitly approved but failed with existing service_role table privilege 42501. No grants/SQL/schema changes made. Actual deletion lifecycle remains unverified here; nullable conversation/deleted-source rendering is exercised at the approved browser response seam, and retained Subject-wide observations/coverage are checked against real persistence.
 - `bash scripts/local.sh check`: passed Docker `npm ci`, `next typegen && tsc --noEmit`, ESLint. npm reported one existing high-severity dependency advisory; no dependency changes by this lane.
 - `bash scripts/local.sh test` first full run: production build passed, 67/68 tests passed; document-history timed out opening Document title. Unchanged isolated `bash scripts/local.sh test tests/document-history.spec.ts` passed 1/1. Final unchanged `bash scripts/local.sh test` passed **68/68 (6.1m)**, including recap/reviewed-recap, approved-practice, adaptive-assessment, outage, integrated document/conversation/Subject suites, auth/settings/privacy/expiry regressions. No unrelated fixes or test weakening.
-- Independent review and merger still required; this ticket is not resolved by worker. Real-provider deployed walkthrough remains outside this local gate. Full detailed candidate/hash/clean-tree and explicit gate release are recorded in the worker handoff artifact.
+- At worker handoff, independent review and merger remained required; the worker did not resolve this ticket. Real-provider deployed walkthrough remains outside this local gate. Full detailed candidate/hash/clean-tree and explicit gate release are recorded in the worker handoff artifact.
+
+## Completion — reviewed integration
+
+- Independent review: **OK with notes; no issues found**, exact candidate `aa08e02e02ffce0f13261a75d280ab74b6aebd8d` against reviewed base `c92f58e7999b8a2c24a21485010672868ecbaeaa`. Review artifact: `.picastle/agent/sessions/--Users-vadimszinatulins-Documents-itera--/subagent-artifacts/outputs/5ecb74d1-9219-4677-85e4-e3f0cc9a726b/typescript/15-review.md`; implementation evidence: same outputs root, `b6eeda02-5542-46db-9607-ff101926d7f2/typescript/15-implementation.md`.
+- Verified clean exact target `080907f3aaa918db384761f51f0e16d5cd974a33` and candidate branch, with reviewed base as common ancestor. Target-only advancement changed only the shared lane board. Merged via `git merge --no-edit` without conflicts: `b0a97677661cd850718760cceca750b951657845`. Source, manifests and tests exactly match the reviewed candidate; merger made no application edits.
+- Inherited Docker typecheck/lint/production-build and final **68/68 tests (6.1m)** evidence; explicitly **not rerun** by merger. Git-only ancestry, source-exactness, whitespace and clean-index checks passed. No Docker/Node execution, pushes, main merge or cleanup.
+- Limits retained: actual deletion lifecycle remains **unverified** after fixture deletion was denied `42501`; browser nullable/deleted-source rendering is not lifecycle evidence. Earlier document-history timeout passed isolated and unchanged full reruns. Existing high-severity dependency advisory remains; deployed real-provider gate and dedicated unexpected-programming-exception injection remain unrun.
+- Only ticket 15 is newly resolved. Ticket 17 is newly unblocked by resolved 02 + 15, **unassigned**, with no Docker gate. Ticket 16 remains blocked by 12. Gate remains with **03**; queue **05 → 08 → 11**. Full spec and final integration/release gates remain incomplete.
