@@ -7,6 +7,38 @@ description: "TypeScript/TSX coding standards. Use when writing, modifying, or r
 
 Apply these rules to new and touched code. Keep broader migrations separate from the requested change. During review, report violations in the review scope rather than rewriting code.
 
+## Ownership and file layout
+
+Colocate code with its narrowest owner. Use these folders inside the owning component directory, alongside the owning `page.tsx`, or inside the owning shared module:
+
+- `types/`: all explicitly declared types and interfaces, including component props and Zod-inferred type aliases. Preserve inference for local values. Keep runtime Zod schemas with validation logic and export their inferred types from `types/` using type-only imports/exports.
+- `actions/`: application operations and server actions.
+- `events/`: event handlers.
+- `helpers/`: helper functions.
+- `components/`: owned subcomponents, following the same component layout recursively.
+
+Create folders only when they have content. Lift code used by multiple owners to their nearest shared owner. Globally shared UI belongs under the project's global `components/`; globally shared non-UI code belongs under global `lib/`, with the same role-based folders inside the appropriate module. Keep imports compatible with client/server boundaries; importing an action must not pull server-only helpers into client code.
+
+A single-file component uses its component name as the filename and exports that component. Once a component has associated files, place it in a directory named for the component, with `index.tsx` exporting the actual component. This includes associated types, actions, events, helpers, and subcomponents. Preserve framework entry-point filenames and official generated shadcn source as required by their respective rules.
+
+For example, a page-owned multi-file component can have this layout:
+
+```text
+app/settings/
+  page.tsx
+  types/
+  actions/
+  components/
+    profile-form/
+      index.tsx
+      types/
+      actions/
+      events/
+      helpers/
+      components/
+        avatar-picker.tsx
+```
+
 ## Library-first
 
 Before implementing generic functionality, inspect installed dependencies and existing project integrations. Reuse their supported APIs. For nontrivial functionality without an existing solution, investigate established libraries before writing custom infrastructure. Keep domain-specific logic and trivial operations local.
