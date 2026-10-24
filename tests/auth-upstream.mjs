@@ -9,6 +9,7 @@ let calls = [];
 let clockOffset = 0;
 let settingsReadMode = 'valid';
 let documentsReadMode = 'valid';
+let recapsReadMode = 'valid';
 let conversationsReadMode = 'valid';
 let settingsReadReports = [];
 http.createServer((request, response) => {
@@ -38,6 +39,11 @@ http.createServer((request, response) => {
   }
   if (path.startsWith('/control/conversations-read/') && request.method === 'POST') {
     conversationsReadMode = path.split('/').at(-1);
+    response.writeHead(204).end();
+    return;
+  }
+  if (path.startsWith('/control/recaps-read/') && request.method === 'POST') {
+    recapsReadMode = path.split('/').at(-1);
     response.writeHead(204).end();
     return;
   }
@@ -183,6 +189,28 @@ http.createServer((request, response) => {
             : { practice_version: { revision: 1, title: 'Private practice', description: '', blocks: null } }),
         }));
         response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(documents));
+      });
+      return;
+    }
+    const recapRead = path === '/rest/v1/practice_recaps';
+    const observationRead = path === '/rest/v1/reviewed_observations';
+    if (request.method === 'GET' && incoming.statusCode === 200 && recapsReadMode !== 'valid' && (recapRead || observationRead)) {
+      // Corrupt only successful real reads after authentication, RLS and persistence; never RPCs/writes.
+      let raw = '';
+      incoming.on('data', chunk => { raw += chunk; });
+      incoming.on('end', () => {
+        const rows = JSON.parse(raw);
+        const diagnostic = 'unsafe synthetic private recap diagnostic';
+        if (recapsReadMode === 'unavailable') {
+          response.writeHead(503, { 'Content-Type': 'application/json' }).end(JSON.stringify({ message: diagnostic }));
+          return;
+        }
+        const variants = {
+          'malformed-proposal': recapRead ? rows.map(row => ({ ...row, proposal: { ...row.proposal, text: 42 }, diagnostic })) : rows,
+          'malformed-observation': observationRead ? rows.map(row => ({ ...row, observation: { ...row.observation, text: 42 }, diagnostic })) : rows,
+          'malformed-sources': observationRead ? rows.map(row => ({ ...row, sources: { diagnostic } })) : rows,
+        };
+        response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(variants[recapsReadMode] ?? rows));
       });
       return;
     }
