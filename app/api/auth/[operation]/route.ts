@@ -1,5 +1,7 @@
 import { authClient } from '@/lib/auth/server';
 import { authConfig } from '@/lib/auth/config';
+import { requestCode } from '@/lib/auth/request-code/actions/request-code';
+import { codeRequestErrorResponse } from '@/lib/auth/request-code/helpers/failures';
 
 function reply(body: object, status = 200) {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -10,7 +12,16 @@ export async function POST(request: Request, context: RouteContext<'/api/auth/[o
     return reply({ error: 'Request not allowed.' }, 403);
   }
   const { operation } = await context.params;
-  if (!['request', 'verify', 'logout'].includes(operation)) return reply({ error: 'Not found.' }, 404);
+  if (!['request', 'verify', 'logout'].includes(operation)) {
+    return reply({ error: 'Not found.' }, 404);
+  }
+  if (operation === 'request') {
+    const [error, acknowledgement] = await requestCode(request);
+    if (error !== null) {
+      return codeRequestErrorResponse(error);
+    }
+    return reply(acknowledgement);
+  }
   try {
     const client = await authClient();
     if (operation === 'logout') {
@@ -29,16 +40,6 @@ export async function POST(request: Request, context: RouteContext<'/api/auth/[o
     const email = input.email.trim().toLowerCase();
     if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return reply({ error: 'Enter a valid email address.' }, 400);
-    }
-    if (operation === 'request') {
-      const { error } = await client.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
-      // Do not reveal whether an account exists. The provider must also disable signup.
-      if (error && !['user_not_found', 'signup_disabled', 'otp_disabled'].includes(error.code ?? '')) {
-        return reply({ error: error.status === 429
-          ? 'Too many requests. Wait a moment before requesting another code.'
-          : 'Could not send a code. Try again in a moment.' }, error.status === 429 ? 429 : 503);
-      }
-      return reply({ ok: true });
     }
     if (!('code' in input) || typeof input.code !== 'string' || !/^\d{6,10}$/.test(input.code)) {
       return reply({ error: 'Enter the code from your email.' }, 400);
