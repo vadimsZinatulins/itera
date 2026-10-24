@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 — Create a Subject with validated form ownership; 10 — Load and resume a conversation trail.
 
-Status: ready-for-review — validated candidate; independent review/integration pending; Docker gate released
+Status: resolved — exact reviewed candidate integrated; Docker gate remains with 17
 
 - [x] Migrate composer field ownership to RHF/Zod while keeping independent view state outside the form. Recovery snapshots synchronize externally without becoming a second authoritative field store.
 - [x] Validate local-storage data from unknown and model corrupt, absent or unavailable storage as explicit supported outcomes; preserve mode/text/operation relationships and account/Subject scope.
@@ -68,3 +68,10 @@ Final gates on source **`0dda5de6058ab89f2dcb6d995182ebdd0219e161`**, including 
 - Scoped Git whitespace/ancestry/scope/clean-index checks pass. Commits disable hooks. No pushes, integration/main edits or ticket resolution performed. **Independent review and merger acceptance remain required.**
 - **11 explicitly releases the exclusive global Docker/Node gate at handoff.** Wrapper cleanup completed; no test containers or `.local/test-lock` remained when checked. No further Docker/Node execution until parent reauthorization. Parent decides next owner.
 - Residual risks: existing npm audit still reports one high-severity dependency advisory; manifests unchanged. Existing npm install-script/deprecation and legacy Docker builder notices remain. No deployed real-provider release walkthrough, production deployment validation or new fault-injected unexpected-programming-defect path; current provider/browser stream validation remains deferred to 12. Local browser storage is device-only/best-effort, not a backup or cross-device guarantee. Ticket not resolved/integrated by this worker.
+
+### Independent review / merger completion
+
+- Independent review **OK/no findings** for exact candidate `aa27b7673349a9fdc3d078b4358cf499d542c93b` against reviewed base `d4c53ff9a945505583e39dee0fb21927067d9aa7`. Review: `.picastle/agent/sessions/--Users-vadimszinatulins-Documents-itera--/subagent-artifacts/outputs/5b8872b6-76d9-4f1f-b5ce-6d817a378da4/typescript/11-review.md`. Implementation handoff: same outputs root, `6f76f9b6-f43c-45b3-832a-a7d257b335ee/typescript/11-implementation.md`.
+- Verified exact clean target `fc39ae948e425cf2e3db1ad2641de5a95b36fbb8` on `feat/typescript-conformance` and exact clean candidate worktree/branch before merge. Common base equals reviewed base; target-only advancement changed only the lane board. Conflict-free `merge --no-edit` produced `2a529493384b0e591a9fd0f0a610e2f2df13b7ee`. No merger-authored application/test/manifest edits; final source/full tree matches candidate except this ticket and the board. Candidate and prior target remain ancestors; scoped whitespace and clean worktree/index checks pass.
+- Inherited final Docker check/typecheck/lint, production build and **95/95** full-suite PASS on latest integrated source; **no Docker/Node reruns** by merger. Earlier reviewed-recaps 45-second timeout remains disclosed: unchanged focused retry and final full suite passed, **no proven root cause**. No timeout relaxation or recap/harness fix claimed.
+- Only **11** newly resolved; **12 newly unblocked, unassigned, no preparation assignment or Docker/Node permission**. **17 retains the exclusive global Docker/Node gate**, remaining queue **06 → 04 → 09**. Full spec/final release gates remain incomplete; all residual risks above remain. Commits/merge used scoped `safe.directory` and `core.hooksPath=/dev/null`; no main merge, push, subagents or cleanup.
