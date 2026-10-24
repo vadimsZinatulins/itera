@@ -7,12 +7,35 @@ const snapshots = ['gpt-5.5-2026-04-23', 'gpt-5.4-mini-2026-03-17'];
 let responseMode = 'completed';
 let calls = [];
 let clockOffset = 0;
+let settingsReadMode = 'valid';
+let settingsReadReports = [];
 http.createServer((request, response) => {
   const path = new URL(request.url, 'http://test.invalid').pathname;
   const control = path.match(/^\/control\/(auth|data)\/(off|on)$/);
   if (control && request.method === 'POST') {
     if (control[2] === 'off') unavailable.add(control[1]);
     else unavailable.delete(control[1]);
+    response.writeHead(204).end();
+    return;
+  }
+  if (path === '/control/settings-read-reports') {
+    if (request.method === 'POST') {
+      let raw = '';
+      request.on('data', chunk => { raw += chunk; });
+      request.on('end', () => {
+        settingsReadReports.push(raw);
+        response.writeHead(204).end();
+      });
+    } else if (request.method === 'DELETE') {
+      settingsReadReports = [];
+      response.writeHead(204).end();
+    } else {
+      response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(settingsReadReports));
+    }
+    return;
+  }
+  if (path.startsWith('/control/settings-read/') && request.method === 'POST') {
+    settingsReadMode = path.split('/').at(-1);
     response.writeHead(204).end();
     return;
   }
@@ -109,6 +132,31 @@ http.createServer((request, response) => {
     hostname: target.hostname, port: target.port, path: request.url,
     method: request.method, headers: { ...request.headers, host: target.host },
   }, incoming => {
+    if (path === '/rest/v1/rpc/server_openai_read' && settingsReadMode !== 'valid' && incoming.statusCode === 200) {
+      // Corrupt only the external response, after real authentication/persistence.
+      let raw = '';
+      incoming.on('data', chunk => { raw += chunk; });
+      incoming.on('end', () => {
+        const rows = JSON.parse(raw);
+        const privateFields = { diagnostic: 'unsafe synthetic private diagnostic', api_key: 'sk-synthetic-status-private-key' };
+        if (settingsReadMode === 'unavailable') {
+          response.writeHead(503, { 'Content-Type': 'application/json' }).end(JSON.stringify({ message: `${privateFields.diagnostic}: ${privateFields.api_key}` }));
+          return;
+        }
+        const variants = {
+          'malformed-model': rows.map(row => ({ ...row, ...privateFields, model: 42 })),
+          'null': null,
+          'object': { ...privateFields, model: snapshots[0] },
+          'null-row': [null],
+          'missing-key': [{ model: snapshots[0], diagnostic: privateFields.diagnostic }],
+          'missing-model': [{ ...privateFields }],
+          'duplicate': [...rows, ...rows],
+          'extra-fields': rows.map(row => ({ ...row, diagnostic: privateFields.diagnostic })),
+        };
+        response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(variants[settingsReadMode]));
+      });
+      return;
+    }
     response.writeHead(incoming.statusCode, incoming.headers);
     incoming.pipe(response);
   });

@@ -14,6 +14,6 @@ Follow the issue blocking graph in `issues/`. Each ticket has an isolated implem
 
 | Lane | Contract / ownership | Isolation | Gate / handoff | Classification |
 | --- | --- | --- | --- | --- |
-| 01 | Settings read operation, validated status and safe outcomes; only shared infrastructure exercised by this consumer | `/tmp/itera-typescript-01`, `feat/typescript-conformance-01` | Docker public settings/privacy/outage tests, typecheck, lint, build; committed handoff | Single vertical seam: schemas, Result and diagnostics are coupled to the settings read consumer; splitting creates artificial handoffs. Exclude settings mutations and unrelated callers. |
+| 01 | Settings read operation, validated status and safe outcomes; only shared infrastructure exercised by this consumer | `/Users/vadimszinatulins/Documents/itera/.local/worktrees/typescript-01`, `feat/typescript-conformance-01` | Docker public settings/privacy/outage tests, typecheck, lint, build; committed handoff | Single vertical seam: schemas, Result and diagnostics are coupled to the settings read consumer; splitting creates artificial handoffs. Exclude settings mutations and unrelated callers. |
 
 Ticket 01 is the initial frontier. All later tickets depend transitively on it. Blockers and exact unrun gates must be retained in handoffs; no ticket is complete merely because code is written.

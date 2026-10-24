@@ -63,12 +63,6 @@ async function available(key: string) {
   return catalogue.filter(model => ids.has(model.id));
 }
 
-export async function settingsStatus() {
-  const account = await authorised();
-  const saved = await read(account.id);
-  // No network call on page load; saved content stays readable during provider outages.
-  return { hasKey: Boolean(saved), model: saved?.model ?? null };
-}
 export async function refreshModels() {
   const account = await authorised();
   const saved = await read(account.id);

@@ -1,5 +1,7 @@
 import { authConfig } from '@/lib/auth/config';
-import { SettingsError, settingsStatus, refreshModels, saveSettings, removeSettings } from '@/lib/openai/server';
+import { SettingsError, refreshModels, saveSettings, removeSettings } from '@/lib/openai/server';
+import { readSettingsStatus } from '@/lib/openai/settings/actions/read-settings-status';
+import { settingsReadErrorResponse } from '@/lib/openai/settings/helpers/failures';
 
 function reply(body: object, status = 200) {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -12,7 +14,14 @@ async function handle(request: Request, action: () => Promise<object>) {
     return reply({ error: 'AI settings are temporarily unavailable. Try again.' }, 503);
   }
 }
-export async function GET(request: Request) { return handle(request, settingsStatus); }
+export async function GET() {
+  const [error, status] = await readSettingsStatus();
+  if (error !== null) {
+    return settingsReadErrorResponse(error);
+  }
+
+  return reply({ hasKey: status.hasKey, model: status.model });
+}
 export async function POST(request: Request) { return handle(request, refreshModels); }
 export async function DELETE(request: Request) { return handle(request, removeSettings); }
 export async function PUT(request: Request) {
