@@ -127,3 +127,51 @@ test('request and resend keep pending controls and recover from a real Auth outa
     await admin().auth.admin.deleteUser(learner.id);
   }
 });
+
+test('pending email edits cannot prevent resending to the acknowledged address', async ({ page }) => {
+  const learner = await provisionAccount();
+  let release = () => {};
+  const pendingDelivery = new Promise<void>(resolve => { release = resolve; });
+  try {
+    await page.goto('/login');
+    const email = page.getByLabel('Email address', { exact: true });
+    const submissions: string[] = [];
+    page.on('request', request => {
+      if (request.url().endsWith('/api/auth/request') && request.method() === 'POST') {
+        submissions.push(request.postData() ?? '');
+      }
+    });
+    await page.route('**/api/auth/request', async route => {
+      await pendingDelivery;
+      await route.continue();
+    });
+    await email.fill(learner.email);
+    const delivery = page.waitForResponse(response => response.url().endsWith('/api/auth/request'));
+    await page.getByRole('button', { name: 'Send code', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Please wait…', exact: true })).toBeDisabled();
+    await email.focus();
+    await page.keyboard.press('ControlOrMeta+A');
+    await page.keyboard.type('not-an-email');
+    release();
+    expect((await delivery).status()).toBe(200);
+    await expect(page.getByLabel('Email code', { exact: true })).toBeFocused();
+    await page.unroute('**/api/auth/request');
+    const first = await latestCode(page.request, learner.email);
+
+    await page.waitForTimeout(2100); // Real local provider resend interval.
+    await page.getByLabel('Email code', { exact: true }).fill('123456');
+    await page.getByRole('button', { name: 'Send another code', exact: true }).click();
+    await expect.poll(() => submissions).toEqual([
+      JSON.stringify({ email: learner.email }),
+      JSON.stringify({ email: learner.email }),
+    ]);
+    await latestCode(page.request, learner.email, first.messageID);
+    await expect(page.getByLabel('Email code', { exact: true })).toHaveValue('');
+    await expect(page.getByLabel('Email code', { exact: true })).toBeFocused();
+    await expect(page.getByRole('alert', { name: 'Sign-in status' })).toHaveCount(0);
+    await expect(page.getByRole('status', { name: 'Sign-in status' })).toContainText('a code is on its way');
+  } finally {
+    release();
+    await admin().auth.admin.deleteUser(learner.id);
+  }
+});
