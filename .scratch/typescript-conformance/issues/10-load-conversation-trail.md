@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — Read AI settings through validated outcomes.
 
-Status: ready-for-review — scoped candidate implemented and Docker gates passed; not integrated/resolved
+Status: resolved — independently reviewed candidate integrated into `feat/typescript-conformance`; inherited Docker evidence, not rerun by merger
 
 - [x] Prefactor transcript ownership before composer/generation migration; organize associated CSS, explicit types, helpers and owned subcomponents while preserving working sends.
 - [x] Validate history/read responses at relevant boundaries and consume parsed output. Establish typed persistence contracts without repeatedly revalidating trusted downstream records.
@@ -37,9 +37,17 @@ Status: ready-for-review — scoped candidate implemented and Docker gates passe
 - `bash scripts/local.sh test tests/openai-settings.spec.ts`: PASS 6/6, 26.4 seconds; existing shared-harness settings behavior preserved. `/tmp/typescript-10-harness-regressions.log`.
 - Git diff whitespace checks pass. Test wrapper cleanup completed; no test lock or test containers remained when inspected. Git hooks disabled for commits to prevent accidental host Node execution.
 
+## Review / integration acceptance
+
+- Independent review **OK, no issues found**: `.picastle/agent/sessions/--Users-vadimszinatulins-Documents-itera--/subagent-artifacts/outputs/b6eeda02-5542-46db-9607-ff101926d7f2/typescript/10-review.md`. Implementation/evidence handoff: same artifact root, `outputs/7fe4860a-a5eb-43d6-b4cd-1a1eb2c92a6d/typescript/10-retry-implementation.md`.
+- Verified clean target `571aa7821d5f1ffacd081d0107030bcd58a682e1` and clean candidate `7c2e616546662dab22860471a2a91a9615948d32` on their exact branches. Reviewed/common base `cb89696751312fd9eaa36d67924d8f0b83643eef`; target-only advancement changed only the shared implementation board.
+- Merged with `merge --no-edit`, hooks disabled, without conflicts via `f6f7ec63d017225eaf0cf2dbed8a1b92d96c4f0d`. Source, manifests and tests exactly match the reviewed candidate; only this ticket and the shared board receive acceptance documentation updates. Git-only ancestry, exactness, whitespace and clean worktree/index checks used; no Docker/Node execution or validation reruns.
+- Inherit the exact candidate final commands and logs above: clean typegen/typecheck/lint, production build, **47/47** public regressions plus **6/6** settings regressions (**53** total). These are candidate results confirmed by independent review, not new merger runs.
+- Only ticket 10 is newly resolved. Ticket 11 is newly unblocked by resolved 02 + 10 and remains unassigned. Ticket 15 retains exclusive Docker/Node tooling and assigned narrow shared-harness ownership; remaining queue **03 → 05 → 08** unchanged. Ticket 15 must merge this integration before its harness edit. No push, main merge or cleanup performed; full spec/final integration/release gates remain incomplete.
+
 ## Residual risks / next gate
 
-- Independent review and separate merger acceptance required; no integration/main mutation or push performed by this worker.
+- Full-effort integration/release acceptance remains outstanding; ticket 10's independent review and integration gates are complete.
 - Full unrelated application suite and deployed real-provider walkthrough remain unrun. Controlled programming-defect throw path not injected; malformed persistence reporting and real Auth/Data outage behavior are covered through public boundaries.
 - Existing dependency audit reports one high-severity advisory; no dependency manifests changed by 10. Existing npm/legacy Docker builder warnings retained, not remediated here.
 - Docker gate released explicitly in candidate handoff; no further tooling until parent authorization.
