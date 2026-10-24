@@ -4,22 +4,45 @@
 
 **Blocked by:** 01 — Read AI settings through validated outcomes.
 
-Status: blocked — prepared RED checkpoint; awaiting exclusive Docker gate
+Status: ready-for-review — scoped candidate implemented and Docker gates passed; not integrated/resolved
 
-- [ ] Prefactor transcript ownership before composer/generation migration; organize associated CSS, explicit types, helpers and owned subcomponents while preserving working sends.
-- [ ] Validate history/read responses at relevant boundaries and consume parsed output. Establish typed persistence contracts without repeatedly revalidating trusted downstream records.
-- [ ] Use shared Result/public-error mapping for expected read failures and sanitized reporting for unexpected defects; preserve public HTTP behavior and account/Subject scoping.
-- [ ] Preserve selected thread, saved partial replies, resumability, scroll behavior and visible loading/empty/failure states. Keep legitimate synchronization effects and unsent drafts intact.
-- [ ] Public conversation/privacy/outage tests cover history, resume, malformed response, incomplete replies and unavailable data without silently treating failure as an empty successful trail.
-- [ ] Relevant typecheck, lint, build and affected tests pass inside Docker before feature-branch integration; server-only imports must remain outside client-safe representations.
+- [x] Prefactor transcript ownership before composer/generation migration; organize associated CSS, explicit types, helpers and owned subcomponents while preserving working sends.
+- [x] Validate history/read responses at relevant boundaries and consume parsed output. Establish typed persistence contracts without repeatedly revalidating trusted downstream records.
+- [x] Use shared Result/public-error mapping for expected read failures and sanitized reporting for unexpected defects; preserve public HTTP behavior and account/Subject scoping.
+- [x] Preserve selected thread, saved partial replies, resumability, scroll behavior and visible loading/empty/failure states. Keep legitimate synchronization effects and unsent drafts intact.
+- [x] Public conversation/privacy/outage tests cover history, resume, malformed response, incomplete replies and unavailable data without silently treating failure as an empty successful trail.
+- [x] Relevant typecheck, lint, build and affected tests pass inside Docker before feature-branch integration; server-only imports remain outside client-safe representations.
 
-## Checkpoint evidence
+## Implementation / authority
 
-- Start verified: `4686dc5925fabeedbc14f96c02974da64a95de7a`, branch `feat/typescript-conformance-10`, clean worktree before edits.
-- Added `tests/conversation-trail.spec.ts`: public browser transport malformed-trail rejection and honest unavailable display; recovery through real local authenticated saved incomplete history. No production edits.
-- RED pending, not executed: `bash scripts/local.sh test tests/conversation-trail.spec.ts`. Expected first failure: malformed numeric thread title is accepted instead of displaying `Could not load your trail. Try reloading.`
-- Supervisor gate decision: ticket 02 retains exclusive Docker gate; queue 07 → 10 → 15. Stop at durable test-only checkpoint; resume only on explicit authorization. No Docker/Node executed, no RED/GREEN or runtime conformance claim.
-- Remaining: execute meaningful RED before production changes; migrate read contracts/ownership; add incremental selected-history malformed/unavailable coverage and refresh/duplicate read-path coverage; preserve all mutation behavior. Docker typecheck/lint/build plus conversation, chat-recovery, limits, approved-practice, adaptive-assessment and outage regressions remain unrun. Merge latest integration, validate and commit final candidate only after authorization/implementation.
+- Verified clean initial HEAD `4686dc5925fabeedbc14f96c02974da64a95de7a`, branch `feat/typescript-conformance-10`. Prepared RED checkpoint `16ec80453d4fe241af0bc5e584aec6f30b53cbfd`; supervisor explicitly transferred exclusive Docker gate 07 → 10 before execution.
+- Scoped ownership: `components/conversations/` (stable extensionless export, unchanged CSS moved, owned thread list/transcript-turn components/types/client read adapter), `lib/conversations/` (schema-inferred read contracts, server Result operation and safe failures), GET-only `app/api/conversations/route.ts`. POST body unchanged. Composer, stream handling, assessment/recovery behavior retained; formatting only outside read integration. Moved recap import uses `@/components/practice-recaps`, unchanged props; recap implementation untouched.
+- Validate/consume parsed values for initial trail, selected history, duplicate-send history and trail refresh. Preserve list `created_at`, all history fields and full nested persisted assessment/question/source snapshots. SQL scalar/opaque JSON contracts established at persistence read; browser transport is independently validated. Read failures do not render successful-empty descriptions.
+- Supervisor approved narrow additive `tests/auth-upstream.mjs` controls for conversation GET list/full-history only, after successful real local auth/RLS/persistence. Reused existing stderr observer without editing `tests/openai-transport.cjs`. Settings/document controls preserved. No production test API or internal mocks.
+- Commits: trail GREEN slice `4e65b91`; validated history/server slice `c1e71d4`; latest integration `cb89696751312fd9eaa36d67924d8f0b83643eef` merged via `234d42588908c9bb3c06fb5b1844ab2bb46b370b` before final gates (earlier merge `2f7fc27` brought 02/07).
+
+## RED → GREEN evidence (Docker only)
+
+- `bash scripts/local.sh test tests/conversation-trail.spec.ts`: RED observed before production edits, repeated on authorized retry. Numeric title accepted; expected failure notice absent (empty Conversation status). Logs `/tmp/typescript-10-red.log`, `/tmp/typescript-10-red-retry.log`.
+- Same command after trail slice: GREEN 1/1 (`/tmp/typescript-10-green-trail.log`).
+- `bash scripts/local.sh test tests/conversation-reads.spec.ts`: meaningful RED 2/2 before history/server changes. Selected malformed status accepted (missing unavailable notice); malformed persisted trail returned 200 instead of 503 (`/tmp/typescript-10-red-history.log`).
+- `bash scripts/local.sh test tests/conversation-trail.spec.ts tests/conversation-reads.spec.ts`: GREEN 3/3, then 7/7 with duplicate/history/refresh, invalid JSON/wrong shapes/HTTP failures and outage coverage. Final version adds full assessment payload preservation (8 focused tests total).
+- Initial `bash scripts/local.sh check` found React effect lint false-positive around async UI wrapper; corrected by handling external read in completion callback. Second check had one unused suppression warning; removed. Final check clean.
+
+## Final gates (source at `234d425`, final evidence-only commit follows)
+
+- `bash scripts/local.sh check`: PASS type generation, TypeScript, ESLint (no warnings). `/tmp/typescript-10-final-check.log`.
+- `docker build --target production -t itera-owner-production .`: PASS production build, image `007148b5634a`. `/tmp/typescript-10-final-build.log`.
+- `bash scripts/local.sh test tests/conversation-trail.spec.ts tests/conversation-reads.spec.ts tests/conversations.spec.ts tests/chat-recovery.spec.ts tests/conversation-limits.spec.ts tests/approved-practice.spec.ts tests/adaptive-assessments.spec.ts tests/outage.spec.ts tests/reviewed-recaps.spec.ts tests/document-reads.spec.ts tests/documents.spec.ts tests/document-editor.spec.ts tests/document-history.spec.ts tests/document-privacy.spec.ts tests/practice-versions.spec.ts tests/practice-approval-guards.spec.ts tests/practice-large-document.spec.ts tests/practice-privacy.spec.ts tests/subjects.spec.ts tests/subject-privacy.spec.ts tests/subject-creation.spec.ts tests/subject-boundaries.spec.ts`: PASS 47/47, 2.1 minutes. `/tmp/typescript-10-final-regressions.log`.
+- `bash scripts/local.sh test tests/openai-settings.spec.ts`: PASS 6/6, 26.4 seconds; existing shared-harness settings behavior preserved. `/tmp/typescript-10-harness-regressions.log`.
+- Git diff whitespace checks pass. Test wrapper cleanup completed; no test lock or test containers remained when inspected. Git hooks disabled for commits to prevent accidental host Node execution.
+
+## Residual risks / next gate
+
+- Independent review and separate merger acceptance required; no integration/main mutation or push performed by this worker.
+- Full unrelated application suite and deployed real-provider walkthrough remain unrun. Controlled programming-defect throw path not injected; malformed persistence reporting and real Auth/Data outage behavior are covered through public boundaries.
+- Existing dependency audit reports one high-severity advisory; no dependency manifests changed by 10. Existing npm/legacy Docker builder warnings retained, not remediated here.
+- Docker gate released explicitly in candidate handoff; no further tooling until parent authorization.
 
 ## Context
 
