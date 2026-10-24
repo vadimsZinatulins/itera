@@ -8,6 +8,7 @@ let responseMode = 'completed';
 let calls = [];
 let clockOffset = 0;
 let settingsReadMode = 'valid';
+let documentsReadMode = 'valid';
 let settingsReadReports = [];
 http.createServer((request, response) => {
   const path = new URL(request.url, 'http://test.invalid').pathname;
@@ -32,6 +33,11 @@ http.createServer((request, response) => {
     } else {
       response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(settingsReadReports));
     }
+    return;
+  }
+  if (path.startsWith('/control/documents-read/') && request.method === 'POST') {
+    documentsReadMode = path.split('/').at(-1);
+    response.writeHead(204).end();
     return;
   }
   if (path.startsWith('/control/settings-read/') && request.method === 'POST') {
@@ -154,6 +160,23 @@ http.createServer((request, response) => {
           'extra-fields': rows.map(row => ({ ...row, diagnostic: privateFields.diagnostic })),
         };
         response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(variants[settingsReadMode]));
+      });
+      return;
+    }
+    if (path === '/rest/v1/learning_documents' && request.method === 'GET' && documentsReadMode !== 'valid' && incoming.statusCode === 200) {
+      // Fault only the successful real read, preserving authentication and RLS.
+      let raw = '';
+      incoming.on('data', chunk => { raw += chunk; });
+      incoming.on('end', () => {
+        const rows = JSON.parse(raw);
+        const documents = rows.map(row => ({
+          ...row,
+          diagnostic: 'unsafe synthetic document diagnostic',
+          ...(documentsReadMode === 'malformed-blocks'
+            ? { blocks: [{ id: 'first', markdown: 42 }] }
+            : { practice_version: { revision: 1, title: 'Private practice', description: '', blocks: null } }),
+        }));
+        response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(documents));
       });
       return;
     }
