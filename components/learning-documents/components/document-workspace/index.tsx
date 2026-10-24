@@ -1,6 +1,12 @@
 'use client';
 
 import { Fragment, useEffect, useState } from 'react';
+import { useController, useForm, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { documentEditorSchema } from './helpers/validation';
+import { submitDocument } from './actions/submit-document';
+import { documentLimitMessage } from '@/lib/documents/helpers/submission-validation';
+import OpenBlockEditor from './components/open-block-editor';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,15 +18,22 @@ import DocumentList from '../document-list';
 import DocumentOutput from '../document-output';
 import type { DocumentOutputMode } from '../document-output/types';
 import Markdown from '../markdown';
-import type { DocumentReadState, DocumentWorkspaceProps, RemovedBlock } from './types';
+import type { DocumentEditorInput, DocumentEditorSubmission, DocumentReadState, DocumentWorkspaceProps, RemovedBlock } from './types';
 import s from '../../learning-documents.module.css';
 
 export default function DocumentWorkspace({ subjectId, sessions }: DocumentWorkspaceProps) {
   const initial = sessions.get(subjectId);
   const [documents, setDocuments] = useState<LearningDocument[]>([]);
-  const [draft, setDraft] = useState<LearningDocument | null>(initial?.draft ?? null);
+  const { register, control, setValue, reset, handleSubmit, formState: { errors } } = useForm<DocumentEditorInput, unknown, DocumentEditorSubmission>({
+    resolver: zodResolver(documentEditorSchema),
+    defaultValues: { draft: initial?.draft ?? null, editing: initial?.editing ?? {} },
+  });
+  const draft = useWatch({ control, name: 'draft' });
+  // One controlled record avoids interpreting arbitrary block IDs as RHF field paths.
+  const { field: editingField } = useController({ control, name: 'editing' });
+  const editing = editingField.value;
+  // Confirmed server output is a deliberate snapshot, not another field store.
   const [saved, setSaved] = useState<LearningDocument | null>(initial?.saved ?? null);
-  const [editing, setEditing] = useState<Record<string, string>>(initial?.editing ?? {});
   const [removed, setRemoved] = useState<RemovedBlock | null>(null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
@@ -55,19 +68,23 @@ export default function DocumentWorkspace({ subjectId, sessions }: DocumentWorks
   }, [subjectId]);
   useEffect(() => {
     const discard = () => {
-      setDraft(saved);
-      setEditing({});
+      reset({ draft: saved, editing: {} });
     };
     window.addEventListener('document-discard', discard);
     return () => window.removeEventListener('document-discard', discard);
-  }, [saved]);
+  }, [reset, saved]);
+  function setDraft(value: LearningDocument | null) {
+    setValue('draft', value);
+  }
+  function setEditing(value: Record<string, string>) {
+    editingField.onChange(value);
+  }
   function leave() {
     return !dirty || window.confirm('Discard unsaved document edits? Cancel to stay and save your Draft.');
   }
   function open(doc: LearningDocument) {
-    setDraft(doc);
+    reset({ draft: doc, editing: {} });
     setSaved(doc.revision ? doc : null);
-    setEditing({});
     setRemoved(null);
     setError('');
     setStatus(doc.revision ? `Saved on server · ${documentStatus(doc)}` : 'Unsaved local edits');
@@ -92,41 +109,36 @@ export default function DocumentWorkspace({ subjectId, sessions }: DocumentWorks
     if (save && draft) {
       blocks(draft.blocks.map(b => b.id === id ? { ...b, markdown: editing[id] } : b));
     }
-    setEditing(current => {
-      const next = { ...current };
-      delete next[id];
-      return next;
-    });
+    const next = { ...editing };
+    delete next[id];
+    setEditing(next);
   }
   function acceptSavedDocument(document: LearningDocument) {
-    setDraft(document);
+    reset({ draft: document, editing: {} });
     setSaved(document);
     setNewer(null);
     setDocuments(current => [document, ...current.filter(doc => doc.id !== document.id)]);
   }
-  async function save() {
-    if (!draft) {
+  async function save(submission: DocumentEditorSubmission) {
+    const draft = submission.draft;
+    if (!draft || Object.keys(submission.editing).length > 0 || busy) {
       return;
     }
     setBusy(true);
     setError('');
     setStatus('Saving…');
-    try {
-      const response = await fetch('/api/documents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: draft.id, subjectId, revision: draft.revision, title: draft.title, description: draft.description, blocks: draft.blocks }) });
-      const result = await response.json();
-      if (!response.ok) {
-        setError(result.error);
-        setStatus('Save failed · unsaved local edits retained');
-        return;
-      }
-      acceptSavedDocument(result);
-      setStatus(`Saved on server · ${documentStatus(result)} · ${result.practice_version ? 'Practice version unchanged' : 'not approved for practice'}`);
-    } catch {
-      setError('Save failed. Check your connection; your edits remain here.');
+    const [saveError, result] = await submitDocument({
+      id: draft.id, subjectId, revision: draft.revision,
+      title: draft.title, description: draft.description, blocks: draft.blocks,
+    });
+    setBusy(false);
+    if (saveError !== null) {
+      setError(saveError.message);
       setStatus('Save failed · unsaved local edits retained');
-    } finally {
-      setBusy(false);
+      return;
     }
+    acceptSavedDocument(result);
+    setStatus(`Saved on server · ${documentStatus(result)} · ${result.practice_version ? 'Practice version unchanged' : 'not approved for practice'}`);
   }
   async function approve() {
     if (!saved || dirty || busy) {
@@ -174,19 +186,20 @@ export default function DocumentWorkspace({ subjectId, sessions }: DocumentWorks
   return <section className="mx-auto mt-8 max-w-4xl space-y-5" aria-label="Document editor">
     <Button variant="ghost" disabled={busy} onClick={() => {
       if (leave()) {
-        setDraft(null);
-        setEditing({});
+        reset({ draft: null, editing: {} });
         setError('');
       }
     }}>All Learning Documents</Button>
     <fieldset disabled={busy} className="min-w-0 space-y-5">
-      <label className="grid gap-2">Document title<Input value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} /></label>
-      <label className="grid gap-2">Document description<Textarea value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })} /></label>
+      <label className="grid gap-2">Document title<Input {...register('draft.title')} aria-invalid={!!errors.draft?.title} aria-describedby={errors.draft?.title ? 'document-title-error' : undefined} /></label>
+      {errors.draft?.title && <p id="document-title-error" role="alert">{errors.draft.title.message}</p>}
+      <label className="grid gap-2">Document description<Textarea {...register('draft.description')} aria-invalid={!!errors.draft?.description} aria-describedby={errors.draft?.description ? 'document-description-error' : undefined} /></label>
+      {errors.draft?.description && <p id="document-description-error" role="alert">{errors.draft.description.message}</p>}
+      {errors.draft?.blocks && <p role="alert">{documentLimitMessage}</p>}
       <p className="text-sm">{dirty && draft.practice_version ? 'Draft revision' : documentStatus(draft)} · {draft.practice_version ? 'Only the approved snapshot is eligible; later Draft changes stay out of practice.' : 'Drafts are excluded from practice.'} Approval means material encountered, not demonstrated understanding.</p>
-      <div className="flex flex-wrap gap-2"><Button disabled={!dirty || Object.keys(editing).length > 0} onClick={save}>Save as Draft</Button><Button variant="outline" disabled={!saved} onClick={() => setOutput('preview')}>Document preview</Button><Button variant="outline" disabled={!saved} onClick={() => setOutput('markdown')}>Final Markdown</Button></div>
+      <div className="flex flex-wrap gap-2"><Button disabled={!dirty || Object.keys(editing).length > 0} onClick={handleSubmit(save)}>Save as Draft</Button><Button variant="outline" disabled={!saved} onClick={() => setOutput('preview')}>Document preview</Button><Button variant="outline" disabled={!saved} onClick={() => setOutput('markdown')}>Final Markdown</Button></div>
       <div className="flex flex-wrap gap-2"><Button disabled={dirty || !saved || !saved.title.trim() || !saved.blocks.some(b => /[\p{L}\p{N}]/u.test(b.markdown)) || saved.practice_version?.revision === saved.revision} onClick={() => setOutput('approve')}>{saved?.practice_version ? 'Update practice version' : 'Ready to Practice'}</Button>{saved?.practice_version && <Button variant="outline" onClick={() => setOutput('practice')}>View practice version</Button>}{dirty && saved && <Button variant="outline" onClick={() => {
-        setDraft(saved);
-        setEditing({});
+        reset({ draft: saved, editing: {} });
         setRemoved(null);
         setError('');
         setStatus(`Saved on server · ${documentStatus(saved)}`);
@@ -198,12 +211,7 @@ export default function DocumentWorkspace({ subjectId, sessions }: DocumentWorks
       {draft.blocks.map((block, index) => <Fragment key={block.id}>
         <Button variant="outline" className="min-h-11" onClick={() => insert(index)}>Insert block before block {index + 1}</Button>
         <article aria-label={`Block ${index + 1}`} className={`${s.markdownBlock} min-w-0 rounded-xl border p-4`}>
-          {block.id in editing ? <div className="space-y-3"><label className="grid gap-2">Block {index + 1} Markdown<Textarea autoFocus className="min-h-48 font-mono" value={editing[block.id]} onChange={e => setEditing({ ...editing, [block.id]: e.target.value })} onKeyDown={e => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.nativeEvent.isComposing && e.keyCode !== 229) {
-              e.preventDefault();
-              finish(block.id, true);
-            }
-          }} /></label><Button onClick={() => finish(block.id, true)}>Save block</Button> <Button variant="outline" onClick={() => finish(block.id, false)}>Cancel</Button></div> : <>
+          {block.id in editing ? <OpenBlockEditor index={index} markdown={editing[block.id]} onChange={markdown => setEditing({ ...editing, [block.id]: markdown })} onSave={() => finish(block.id, true)} onCancel={() => finish(block.id, false)} /> : <>
             <div className={`${s.blockTools} mb-3 flex flex-wrap gap-2`}><Button variant="ghost" aria-label={`Edit block ${index + 1}`} onClick={() => setEditing({ ...editing, [block.id]: block.markdown })}>Edit</Button><Button variant="ghost" disabled={index === 0} onClick={() => {
               const next = [...draft.blocks];
               [next[index - 1], next[index]] = [next[index], next[index - 1]];
