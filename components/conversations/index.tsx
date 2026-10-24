@@ -5,19 +5,16 @@ import { History, MessageCircle, Plus, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { documentId as operationId } from '@/lib/document-id';
-import { readChatRecovery, saveChatRecovery, type ChatOperation } from '@/lib/chat-recovery';
+import { readChatRecovery, saveChatRecovery, type ChatOperation as Operation } from '@/lib/chat-recovery';
 import styles from './conversations.module.css';
-import PracticeRecaps from './practice-recaps';
-import type { Assessment } from '@/lib/assessment';
-import AssessmentBudgetStatus from './assessment-budget';
+import PracticeRecaps from '@/components/practice-recaps';
+import AssessmentBudgetStatus from '@/components/assessment-budget';
+import { readTrail } from './actions/read-history';
+import type { ConversationsProps, ReadStatus, Thread, Turn } from './types';
 
-type Thread = { id: string; title: string };
-type Source = { id: string; title: string; revision: number };
-type Turn = { assessment?: Assessment | null; practice?: boolean; sources?: Source[]; id: string; ordinal: number; user_text: string; assistant_text: string; status: 'complete' | 'incomplete'; pending_until: string };
-type Operation = ChatOperation;
-
-export default function Conversations({ accountId, subjectId, initialConversation }: { accountId: string; subjectId: string; initialConversation?: string }) {
+export default function Conversations({ accountId, subjectId, initialConversation }: ConversationsProps) {
   const [threads, setThreads] = useState<Thread[]>([]);
+  const [trailStatus, setTrailStatus] = useState<ReadStatus>('loading');
   const [selected, setSelected] = useState(initialConversation ?? '');
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState('');
@@ -77,19 +74,24 @@ export default function Conversations({ accountId, subjectId, initialConversatio
     window.history.replaceState(null, '', next);
   }
   async function trail(signal?: AbortSignal) {
-    const response = await fetch(`/api/conversations?subject=${subjectId}`, { cache: 'no-store', signal });
-    if (!response.ok) throw new Error('Could not load your trail. Try reloading.');
-    const data = await response.json();
-    if (active.current && !signal?.aborted) setThreads(data);
+    const [error, data] = await readTrail(subjectId, signal);
+    if (!active.current || signal?.aborted) {
+      return;
+    }
+    if (error !== null) {
+      setTrailStatus('unavailable');
+      setNotice(error.message);
+      return;
+    }
+    setThreads(data);
+    setTrailStatus('ready');
   }
   useEffect(() => {
     const controller = new AbortController();
-    void fetch(`/api/conversations?subject=${subjectId}`, { cache: 'no-store', signal: controller.signal }).then(async response => {
-      if (!response.ok) throw new Error('Trail unavailable');
-      const data = await response.json();
-      if (active.current && !controller.signal.aborted) setThreads(data);
-    }).catch(() => { if (!controller.signal.aborted) setNotice('Could not load your trail. Try reloading.'); });
+    void trail(controller.signal);
     return () => { controller.abort(); abort.current?.abort(); };
+    // The parent keys the component by Subject; trail uses that mounted scope.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subjectId]);
   useEffect(() => {
     if (!selected) return;
@@ -189,9 +191,11 @@ export default function Conversations({ accountId, subjectId, initialConversatio
       <Button variant={mobile === 'chat' ? 'secondary' : 'ghost'} aria-pressed={mobile === 'chat'} onClick={() => setMobile('chat')}><MessageCircle />Chat</Button>
     </nav>
     <div className={styles.workspace} data-view={mobile}>
-      <aside className={styles.trail} aria-label="Conversation threads" tabIndex={0}>
+      <aside className={styles.trail} aria-label="Conversation threads" tabIndex={0} aria-busy={trailStatus === 'loading'}>
         <Button className="mb-4 min-h-11 w-full" variant="outline" disabled={busy} onClick={() => choose('')}><Plus />A new thread</Button>
-        {!threads.length && <p className="text-sm leading-7 text-muted-foreground">Your first saved message adds a conversation here. Return whenever you like.</p>}
+        {trailStatus === 'loading' && <p>Loading your trail…</p>}
+        {trailStatus === 'unavailable' && <p>Could not load your trail. Try reloading.</p>}
+        {trailStatus === 'ready' && !threads.length && <p className="text-sm leading-7 text-muted-foreground">Your first saved message adds a conversation here. Return whenever you like.</p>}
         {threads.map(thread => <button key={thread.id} disabled={busy} aria-current={selected === thread.id ? 'true' : undefined} className="mb-2 block min-h-11 w-full rounded-lg border p-3 text-left text-sm break-words aria-[current=true]:bg-muted" onClick={() => choose(thread.id)}>{thread.title}</button>)}
       </aside>
       <section className={styles.chat} aria-label="Subject conversation">
