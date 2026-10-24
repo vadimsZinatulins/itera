@@ -1,5 +1,8 @@
 import { authConfig } from '@/lib/auth/config';
-import { SettingsError, refreshModels, saveSettings, removeSettings } from '@/lib/openai/server';
+import { SettingsError, refreshModels } from '@/lib/openai/server';
+import { removeCredentials, saveCredentials } from '@/lib/openai/settings/actions/mutate-credentials';
+import { readCredentialSubmission } from '@/lib/openai/settings/actions/read-credential-submission';
+import { credentialMutationErrorResponse } from '@/lib/openai/settings/helpers/credential-failures';
 import { readSettingsStatus } from '@/lib/openai/settings/actions/read-settings-status';
 import { settingsReadErrorResponse } from '@/lib/openai/settings/helpers/failures';
 
@@ -23,23 +26,28 @@ export async function GET() {
   return reply({ hasKey: status.hasKey, model: status.model });
 }
 export async function POST(request: Request) { return handle(request, refreshModels); }
-export async function DELETE(request: Request) { return handle(request, removeSettings); }
+export async function DELETE(request: Request) {
+  if (request.headers.get('origin') !== authConfig().origin) {
+    return reply({ error: 'Request not allowed.' }, 403);
+  }
+  const [error, removed] = await removeCredentials();
+  if (error !== null) {
+    return credentialMutationErrorResponse(error);
+  }
+  return reply(removed);
+}
+
 export async function PUT(request: Request) {
-  return handle(request, async () => {
-    const reader = request.body?.getReader();
-    if (!reader) throw new SettingsError('Enter a key or select a model.', 400);
-    const chunks: Uint8Array[] = [];
-    let size = 0;
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > 2048) { await reader.cancel(); throw new SettingsError('Request too large.', 413); }
-      chunks.push(value);
-    }
-    let input: unknown;
-    try { input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
-    catch { throw new SettingsError('Enter valid settings.', 400); }
-    return saveSettings(input);
-  });
+  if (request.headers.get('origin') !== authConfig().origin) {
+    return reply({ error: 'Request not allowed.' }, 403);
+  }
+  const [submissionError, submission] = await readCredentialSubmission(request);
+  if (submissionError !== null) {
+    return credentialMutationErrorResponse(submissionError);
+  }
+  const [error, saved] = await saveCredentials(submission.input);
+  if (error !== null) {
+    return credentialMutationErrorResponse(error);
+  }
+  return reply(saved);
 }
