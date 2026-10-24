@@ -98,7 +98,7 @@ export default function SignIn() {
             <Input ref={codeInput} id="code" name="code" value={code} onChange={event => setCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6,10}" minLength={6} maxLength={10} required className="min-h-11" aria-describedby="sign-in-status" />
           </> : <>
             <label className="block text-sm" htmlFor="email">Email address</label>
-            <Input id="email" {...register('email')} type="email" autoComplete="email" maxLength={254} required className="min-h-11" aria-invalid={!!errors.email} aria-describedby={error ? 'sign-in-message' : undefined} />
+            <Input id="email" {...register('email')} type="email" autoComplete="email" maxLength={254} required readOnly={isSubmitting} className="min-h-11" aria-invalid={!!errors.email} aria-describedby={error ? 'sign-in-message' : undefined} />
           </>}
           <Button type="submit" disabled={busy} className="min-h-11 w-full">{busy ? 'Please wait…' : sentTo ? 'Verify code' : 'Send code'}</Button>
         </form>
