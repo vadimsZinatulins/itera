@@ -4,21 +4,22 @@
 
 **Blocked by:** 01 — Read AI settings through validated outcomes.
 
-Status: ready-for-agent
+Status: resolved
+Implementation: reviewed candidate `596ea41fbba531ea6617f0470d31e7966a8653f3` integrated into `feat/typescript-conformance` via merge `e2d06a36bcea259ffc02bb03f6c6b90dcf2f283e`.
 
-- [ ] Obtain explicit approval for React Hook Form and the official Zod resolver before installing them; verify selected-version compatibility. Reuse approved Zod integration and shared operation outcomes.
-- [ ] Subject creation validates browser submission and trusted server input, consumes normalized schema output and returns explicit application outcomes while preserving the public HTTP contract.
-- [ ] Derive account ownership server-side. Preserve the tested behavior that ignores forged ownership input rather than indiscriminately rejecting extra fields; retain independent RLS/direct-data checks.
-- [ ] RHF owns editable field state without a competing React-state mirror. Preserve labels, focus, pending/disabled controls, duplicate-name feedback and text after failure.
-- [ ] Colocate the form, explicit types, schemas and associated behavior under the narrowest owner; establish reusable conventions without a speculative global form framework. Apply touched-code readability rules.
-- [ ] Public browser/API/data tests cover successful creation, duplicate names, wrong shapes, normalization, ownership spoofing and outage recovery.
-- [ ] Relevant typecheck, lint, build and affected tests pass inside Docker before feature-branch integration; document any blockers.
+- [x] Obtain explicit approval for React Hook Form and the official Zod resolver before installing them; verify selected-version compatibility. Reuse approved Zod integration and shared operation outcomes.
+- [x] Subject creation validates browser submission and trusted server input, consumes normalized schema output and returns explicit application outcomes while preserving the public HTTP contract.
+- [x] Derive account ownership server-side. Preserve the tested behavior that ignores forged ownership input rather than indiscriminately rejecting extra fields; retain independent RLS/direct-data checks.
+- [x] RHF owns editable field state without a competing React-state mirror. Preserve labels, focus, pending/disabled controls, duplicate-name feedback and text after failure.
+- [x] Colocate the form, explicit types, schemas and associated behavior under the narrowest owner; establish reusable conventions without a speculative global form framework. Apply touched-code readability rules.
+- [x] Public browser/API/data tests cover successful creation, duplicate names, wrong shapes, normalization, ownership spoofing and outage recovery.
+- [x] Relevant typecheck, lint, build and affected tests pass inside Docker before feature-branch integration; document any blockers.
 
 ## Context
 
 Parent: [conformance spec](../spec.md). Simple action and filter controls remain ordinary React state. This is a behavior-preserving form migration, not Subject feature expansion.
 
-## Implementation evidence (candidate; independent review/merge pending)
+## Implementation evidence (reviewed and integrated)
 
 - Clean branch `feat/typescript-conformance-02` started exactly at integration `4686dc5925fabeedbc14f96c02974da64a95de7a` before edits. `git merge --no-edit feat/typescript-conformance` before final gates: already up to date at that same tip. No main/integration mutations, shared harness edits, or developer runtime changes.
 - User approved RHF/resolver additions in the assignment. Official RHF `useForm` documentation and resolver v5.2.2 README document `zodResolver`, schema input/output generics, registered fields, submission state and focus. Registry peer requirements: RHF 7.91.0 supports React 19 and Node >=18; resolver 5.2.2 supports RHF ^7.55.0 and its official README supports Zod 4. Installed React 19.3.0, Node 24, and direct Zod 4.6.7 are compatible. Added exactly `react-hook-form@7.91.0` and `@hookform/resolvers@5.2.2`, plus resolver's required transitive `@standard-schema/utils@0.3.0`. Initial resolver 6.0.0 resolution failed due incompatible optional Effect peers; no force/legacy-peer-deps, no manifest changes from the failed attempt, and no extra direct dependencies installed.
@@ -29,4 +30,11 @@ Parent: [conformance spec](../spec.md). Simple action and filter controls remain
 - Public tests use real local authentication/persistence, direct public API/data privacy boundaries and existing controlled outage effects. New suites cover local correction/focus, pending controls, duplicate input, real Data outage recovery, network interruption, malformed browser response shapes, diagnostic suppression, Unicode and request boundaries. Extended Subject privacy suite covers JSON null/arrays/primitives/wrong fields, malformed JSON, forged ownership/ID and ignored extras; existing direct-data RLS checks retained.
 - Intermediate expanded suite: 6 passed/1 failed because the alert timeout preceded the real upstream retry response. Test now explicitly awaits the public failed POST response (503) before checking its UI; no application/timeout weakening. Focused rerun `bash scripts/local.sh test tests/subject-creation.spec.ts -g 'pending controls'`: **1 passed (9.6s)**.
 - Final Docker gates: `bash scripts/local.sh check` passed `next typegen && tsc --noEmit` and ESLint. `bash scripts/local.sh test tests/subjects.spec.ts tests/subject-privacy.spec.ts tests/subject-creation.spec.ts tests/subject-boundaries.spec.ts tests/outage.spec.ts tests/document-editor.spec.ts tests/document-history.spec.ts` passed optimized Next production build plus standalone/test images and **10 tests (41.3s)**. Includes untouched document editor/history/navigation regression. `git diff --check` passed.
-- Residual: Docker `npm audit --json` still reports the existing one high-severity transitive `body-parser` advisory (GHSA-27r3-jxmh-p828); unrelated remediation excluded. Full unrelated application suite, deployed real-provider walkthrough and dedicated corrupted Subject persistence/diagnostic-injection tests were not run. No new production test seam added. Failed-run private diagnostics remain ignored under `.local`; test containers cleaned; existing developer services untouched. Independent reviewer and merger must approve this candidate before integration; ticket is not declared resolved by this evidence.
+- Residual: Docker `npm audit --json` still reports the existing one high-severity transitive `body-parser` advisory (GHSA-27r3-jxmh-p828); unrelated remediation excluded. Full unrelated application suite, deployed real-provider walkthrough and dedicated corrupted Subject persistence/diagnostic-injection tests were not run. No new production test seam added. Failed-run private diagnostics remain ignored under `.local`; test containers cleaned; existing developer services untouched. These are candidate-run limitations, retained after review and integration.
+
+## Review and integration evidence
+
+- Independent read-only review: **OK; no issues found**, exact candidate `596ea41fbba531ea6617f0470d31e7966a8653f3` against base `4686dc5925fabeedbc14f96c02974da64a95de7a`. Review artifact: `.picastle/agent/sessions/--Users-vadimszinatulins-Documents-itera--/subagent-artifacts/outputs/d4a4d6d8-ad64-4435-9bbd-8f525644cf00/typescript/02-review.md`; candidate/gate handoff: corresponding `outputs/eadfa240-1ca3-4458-8071-7d344c990704/typescript/02-handoff.md`.
+- Merger verified clean integration target `cc51d8c04d84b097cc139882fbffbb559dfa43f1`, exact clean candidate branch/worktree, and common base `4686dc5925fabeedbc14f96c02974da64a95de7a`. Target advancement changed only `implementation.md`. `git merge --no-edit 596ea41fbba531ea6617f0470d31e7966a8653f3` produced conflict-free non-fast-forward merge `e2d06a36bcea259ffc02bb03f6c6b90dcf2f283e`; no source resolutions or edits.
+- Reviewed source, manifests and tests are byte-for-byte identical to candidate. Immediately after merge the only candidate-relative difference was the previously integrated `implementation.md`; resolution updates change only this ticket and the shared board. Candidate ancestry, clean index/worktree and `git diff --check` verified by merger.
+- Docker typecheck/lint/production build and **10 passing tests** above are **inherited candidate evidence, not rerun**. No Docker/Node tooling invoked by merger; **07 retains the gate**, with **10 → 15** queued. Tickets **03 and 05 are newly unblocked**, not implemented or claimed by this merge. Full spec and final integrated/release gates remain incomplete.
